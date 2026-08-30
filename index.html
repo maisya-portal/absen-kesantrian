@@ -532,6 +532,72 @@
     </div>
   </div>
 
+  <!-- ✏️ MODAL UBAH STATUS KEHADIRAN (PWA) -->
+  <div class="modal fade" id="modal-ubah-status-pwa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+        <div class="modal-header bg-warning text-dark border-0 py-3">
+          <h6 class="modal-title fw-bold mb-0"><i class="bi bi-pencil-square me-1"></i> Ubah Status Kehadiran Staf</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          <input type="hidden" id="ubah-pwa-id">
+          <div class="p-2.5 bg-light rounded-3 border mb-3 small d-flex justify-content-between align-items-center">
+            <div>
+              <span class="text-muted d-block" style="font-size: 11px;">Nama Staff:</span>
+              <strong class="text-dark" id="ubah-pwa-name">-</strong>
+            </div>
+            <div class="text-end">
+              <span class="text-muted d-block" style="font-size: 11px;">Status Saat Ini:</span>
+              <span class="badge bg-secondary" id="ubah-pwa-current">-</span>
+            </div>
+          </div>
+
+          <label class="form-label small fw-bold text-dark mb-1.5">Pilih Status Baru:</label>
+          <div class="d-flex flex-column gap-2 mb-3">
+            <div class="form-check p-2 rounded-3 border bg-white cursor-pointer d-flex align-items-center gap-2">
+              <input class="form-check-input ms-0 me-2" type="radio" name="ubah_pwa_status" id="pwa-status-sakit" value="Sakit" checked>
+              <label class="form-check-label w-100 cursor-pointer" for="pwa-status-sakit">
+                <strong class="text-warning text-darken"><i class="bi bi-bandaid-fill me-1 text-warning"></i> Sakit</strong>
+                <div class="text-muted" style="font-size: 11px;">Staf sakit / berhalangan medis (sesi aktif dihentikan).</div>
+              </label>
+            </div>
+            <div class="form-check p-2 rounded-3 border bg-white cursor-pointer d-flex align-items-center gap-2">
+              <input class="form-check-input ms-0 me-2" type="radio" name="ubah_pwa_status" id="pwa-status-izin" value="Izin">
+              <label class="form-check-label w-100 cursor-pointer" for="pwa-status-izin">
+                <strong class="text-info"><i class="bi bi-info-circle-fill me-1"></i> Izin</strong>
+                <div class="text-muted" style="font-size: 11px;">Staf izin ada keperluan mendesak.</div>
+              </label>
+            </div>
+            <div class="form-check p-2 rounded-3 border bg-white cursor-pointer d-flex align-items-center gap-2">
+              <input class="form-check-input ms-0 me-2" type="radio" name="ubah_pwa_status" id="pwa-status-alfa" value="Alfa">
+              <label class="form-check-label w-100 cursor-pointer" for="pwa-status-alfa">
+                <strong class="text-danger"><i class="bi bi-x-circle-fill me-1"></i> Alfa / Mangkir</strong>
+                <div class="text-muted" style="font-size: 11px;">Staf tidak hadir / tidak ada di lokasi tugas.</div>
+              </label>
+            </div>
+            <div class="form-check p-2 rounded-3 border bg-white cursor-pointer d-flex align-items-center gap-2">
+              <input class="form-check-input ms-0 me-2" type="radio" name="ubah_pwa_status" id="pwa-status-hadir" value="Hadir">
+              <label class="form-check-label w-100 cursor-pointer" for="pwa-status-hadir">
+                <strong class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Hadir</strong>
+                <div class="text-muted" style="font-size: 11px;">Staf hadir dan aktif bertugas.</div>
+              </label>
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small fw-bold text-dark">Keterangan / Alasan Koreksi:</label>
+            <textarea class="form-control form-control-sm" id="ubah-pwa-note" rows="2" placeholder="Contoh: Staf konfirmasi demam via WA"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-0 p-3 pt-0">
+          <button type="button" class="btn btn-sm btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-sm btn-warning rounded-pill px-4 fw-bold" onclick="submitUbahStatusPwa()"><i class="bi bi-check2 me-1"></i> Simpan Perubahan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Floating Toast -->
   <div id="toast-quick" class="d-none">
     <i class="bi bi-info-circle-fill text-warning fs-5" id="toast-icon"></i>
@@ -852,9 +918,14 @@
 
             <div class="d-flex justify-content-between align-items-center mt-2 small">
               <span class="text-muted" style="font-size: 11px;"><i class="bi bi-shield-check text-success me-1"></i> ${escapeHtml(validator)}</span>
-              <button class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-0.5" style="font-size: 11px;" onclick="kirimWaKadivDirect('${escapeHtml(name)}', '${escapeHtml(shift)}', '${escapeHtml(jamMasuk)}')">
-                <i class="bi bi-whatsapp me-1"></i> WA
-              </button>
+              <div class="d-flex align-items-center gap-1.5">
+                <button class="btn btn-sm btn-outline-warning rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 11px;" onclick="openUbahStatusPwa('${item.ID_AbsenStaff}', '${escapeHtml(name)}', '${escapeHtml(item.Status || 'Hadir')}', '${escapeHtml(item.Catatan || '')}')">
+                  <i class="bi bi-pencil-square me-1"></i> Ubah
+                </button>
+                <button class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-0.5" style="font-size: 11px;" onclick="kirimWaKadivDirect('${escapeHtml(name)}', '${escapeHtml(shift)}', '${escapeHtml(jamMasuk)}')">
+                  <i class="bi bi-whatsapp me-1"></i> WA
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -903,6 +974,9 @@
             <td>${badgeStatus}</td>
             <td class="small text-muted">${escapeHtml(validator)}</td>
             <td class="pe-3 text-center">
+              <button class="btn btn-xs btn-outline-warning rounded-circle p-1 me-1" title="Ubah Status" onclick="openUbahStatusPwa('${id}', '${escapeHtml(nama)}', '${escapeHtml(kehadiran)}', '${escapeHtml(catatan)}')">
+                <i class="bi bi-pencil-square"></i>
+              </button>
               <button class="btn btn-xs btn-outline-success rounded-circle p-1" onclick="kirimWaKadivDirect('${escapeHtml(nama)}', '${escapeHtml(shift)}', '${escapeHtml(masuk)}')">
                 <i class="bi bi-whatsapp"></i>
               </button>
@@ -982,6 +1056,57 @@
       document.getElementById('reject-note').value = '';
       const modal = new bootstrap.Modal(document.getElementById('modal-reject'));
       modal.show();
+    }
+
+    function openUbahStatusPwa(id, name, currentStatus, currentNote) {
+      document.getElementById('ubah-pwa-id').value = id;
+      document.getElementById('ubah-pwa-name').textContent = name;
+      document.getElementById('ubah-pwa-current').textContent = currentStatus || 'Hadir';
+      document.getElementById('ubah-pwa-note').value = currentNote || '';
+
+      if (currentStatus === 'Hadir') {
+        document.getElementById('pwa-status-sakit').checked = true;
+      } else if (currentStatus === 'Sakit') {
+        document.getElementById('pwa-status-sakit').checked = true;
+      } else if (currentStatus === 'Izin') {
+        document.getElementById('pwa-status-izin').checked = true;
+      } else if (currentStatus === 'Alfa') {
+        document.getElementById('pwa-status-alfa').checked = true;
+      }
+
+      const modal = new bootstrap.Modal(document.getElementById('modal-ubah-status-pwa'));
+      modal.show();
+    }
+
+    function submitUbahStatusPwa() {
+      const id = document.getElementById('ubah-pwa-id').value;
+      const radios = document.getElementsByName('ubah_pwa_status');
+      let newStatus = 'Sakit';
+      for (let i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+          newStatus = radios[i].value;
+          break;
+        }
+      }
+      const note = document.getElementById('ubah-pwa-note').value;
+
+      showToast(`Mengubah status ke: ${newStatus}...`, 'info');
+      bootstrap.Modal.getInstance(document.getElementById('modal-ubah-status-pwa')).hide();
+
+      callGasApi('kadiv_change_status', {
+        id: id,
+        status: newStatus,
+        catatan: note,
+        validatorName: 'Kadiv Kesantrian (PWA)',
+        validatorId: 'STF-KADIV'
+      }, function(res) {
+        if (res && res.success) {
+          showToast(`✅ ${res.message}`, 'success');
+          fetchKadivData(true);
+        } else {
+          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+        }
+      });
     }
 
     function submitRejection() {
