@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Persetujuan Kadiv Kesantrian - PWA</title>
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#10b981">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kadiv Absen">
+  <link rel="apple-touch-icon" href="icon-192x192.png">
+  <link rel="icon" type="image/png" href="icon-192x192.png">
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  
+  <!-- HTML5 QR Code Scanner -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    :root {
+      --primary-color: #10b981;
+      --primary-dark: #059669;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding-bottom: 90px;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* PWA Install Banner */
+    #pwa-install-banner {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border-radius: 16px;
+      margin: 12px 12px 0 12px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* PIN Lock Screen */
+    #pin-lock-screen {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(145deg, #0f172a, #1e293b);
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .pin-card {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(12px);
+      border-radius: 24px;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .pin-dots {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .pin-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+      transition: all 0.2s;
+    }
+    .pin-dot.filled {
+      background: #10b981;
+      border-color: #10b981;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+      transform: scale(1.15);
+    }
+    .keypad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .key-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: white;
+      font-size: 22px;
+      font-weight: 600;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .key-btn:active {
+      background: #10b981;
+      transform: scale(0.92);
+    }
+
+    /* App Header */
+    .app-header {
+      background: white;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 1020;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+
+    /* Nav Tabs Pill */
+    .nav-tabs-pill {
+      background: #e2e8f0;
+      border-radius: 16px;
+      padding: 4px;
+      display: flex;
+      gap: 4px;
+      border: none;
+    }
+    .nav-tabs-pill .nav-link {
+      flex: 1;
+      text-align: center;
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-muted);
+      border: none;
+      transition: all 0.2s;
+    }
+    .nav-tabs-pill .nav-link.active {
+      background: white;
+      color: #047857;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+    }
+
+    /* Cards & Badges */
+    .approval-card {
+      background: white;
+      border-radius: 18px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+      padding: 16px;
+      margin-bottom: 14px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .approval-card:hover {
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      display: inline-block;
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* Scanner Viewport */
+    #scanner-viewport {
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #000;
+    }
+    #scanner-viewport video {
+      border-radius: 16px;
+      width: 100% !important;
+      height: auto !important;
+    }
+
+    /* Floating Toast */
+    #toast-quick {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100000;
+      background: #0f172a;
+      color: white;
+      border-radius: 30px;
+      padding: 12px 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 90vw;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================== -->
+  <!-- 🔒 LAYAR KODE PIN KEAMANAN KADIV -->
+  <!-- ========================================== -->
+  <div id="pin-lock-screen">
+    <div class="pin-card" id="pin-box">
+      <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-20 rounded-circle text-success mb-2" style="width: 56px; height: 56px;">
+        <i class="bi bi-shield-lock-fill fs-2"></i>
+      </div>
+      <h5 class="fw-bold mb-1 text-white">PIN Keamanan Kadiv</h5>
+      <p class="text-white-50 small mb-2">Masukkan 6 digit kode PIN untuk mengakses.</p>
+
+      <div class="pin-dots">
+        <div class="pin-dot" id="dot-0"></div>
+        <div class="pin-dot" id="dot-1"></div>
+        <div class="pin-dot" id="dot-2"></div>
+        <div class="pin-dot" id="dot-3"></div>
+        <div class="pin-dot" id="dot-4"></div>
+        <div class="pin-dot" id="dot-5"></div>
+      </div>
+
+      <div id="pin-error-msg" class="text-danger small fw-semibold mb-2 d-none">
+        <i class="bi bi-exclamation-circle me-1"></i> PIN Salah! Silakan coba lagi.
+      </div>
+
+      <div class="form-check form-switch d-flex justify-content-center align-items-center gap-2 mb-3">
+        <input class="form-check-input" type="checkbox" id="check-remember-pin" style="cursor: pointer;">
+        <label class="form-check-label text-white-50 small" for="check-remember-pin" style="cursor: pointer;">
+          Ingat perangkat ini (Bypass PIN)
+        </label>
+      </div>
+
+      <div class="keypad-grid">
+        <button type="button" class="key-btn" onclick="pressPin('1')">1</button>
+        <button type="button" class="key-btn" onclick="pressPin('2')">2</button>
+        <button type="button" class="key-btn" onclick="pressPin('3')">3</button>
+        <button type="button" class="key-btn" onclick="pressPin('4')">4</button>
+        <button type="button" class="key-btn" onclick="pressPin('5')">5</button>
+        <button type="button" class="key-btn" onclick="pressPin('6')">6</button>
+        <button type="button" class="key-btn" onclick="pressPin('7')">7</button>
+        <button type="button" class="key-btn" onclick="pressPin('8')">8</button>
+        <button type="button" class="key-btn" onclick="pressPin('9')">9</button>
+        <button type="button" class="key-btn text-warning" onclick="clearPin()"><i class="bi bi-x-lg"></i></button>
+        <button type="button" class="key-btn" onclick="pressPin('0')">0</button>
+        <button type="button" class="key-btn text-danger" onclick="backspacePin()"><i class="bi bi-backspace"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PWA Install Banner -->
+  <div id="pwa-install-banner">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-phone-fill fs-4"></i>
+      <div>
+        <div class="fw-bold small">Pasang Aplikasi Kadiv</div>
+        <div style="font-size: 11px; opacity: 0.9;">Akses instan dari layar utama HP Anda</div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-1">
+      <button class="btn btn-sm btn-light text-success fw-bold rounded-pill px-3" onclick="installPWA()">Pasang</button>
+      <button class="btn btn-sm text-white" onclick="dismissPwaBanner()"><i class="bi bi-x-lg"></i></button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 📱 HEADER APLIKASI KADIV -->
+  <!-- ========================================== -->
+  <header class="app-header p-3">
+    <div class="container-fluid max-w-700 p-0">
+      <div class="d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <div class="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center shadow-sm" style="width: 42px; height: 42px;">
+            <i class="bi bi-shield-check fs-5"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-dark lh-sm" style="font-size: 15px;">Persetujuan Kadiv</div>
+            <div class="d-flex align-items-center gap-1 small text-muted">
+              <span class="pulse-dot"></span>
+              <span id="sync-status">Sinkronisasi Otomatis</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <!-- Button Scanner Barcode -->
+          <button type="button" class="btn btn-sm btn-warning rounded-pill px-2.5 py-1.5 fw-bold shadow-sm d-flex align-items-center gap-1" onclick="openScannerModal()">
+            <i class="bi bi-qr-code-scan"></i>
+            <span class="d-none d-sm-inline">Scan</span>
+          </button>
+
+          <!-- Toggle Auto Approval -->
+          <div class="form-check form-switch m-0 d-flex align-items-center gap-1 bg-light border rounded-pill px-2 py-1" title="Sakelar Persetujuan Otomatis / Manual">
+            <input class="form-check-input ms-0" type="checkbox" role="switch" id="auto-approve-toggle" onchange="toggleAutoApproval(this.checked)" style="cursor: pointer;">
+            <label class="form-check-label small fw-semibold text-dark me-1" for="auto-approve-toggle" id="auto-approve-label" style="font-size: 11px; cursor: pointer;">
+              Manual
+            </label>
+          </div>
+
+          <!-- Lock Button -->
+          <button class="btn btn-sm btn-light border rounded-circle p-2" onclick="lockPinScreen()" title="Kunci Aplikasi">
+            <i class="bi bi-lock-fill text-muted"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Real-time Clock Info -->
+      <div class="d-flex align-items-center justify-content-between mt-2 pt-2 border-top text-muted" style="font-size: 11.5px;">
+        <span id="clock-gregorian"><i class="bi bi-calendar3 text-success me-1"></i>Memuat...</span>
+        <span id="clock-time" class="fw-bold text-dark font-monospace"><i class="bi bi-clock text-warning me-1"></i>00:00:00</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- 📑 NAVIGASI TAB UTAMA -->
+  <!-- ========================================== -->
+  <div class="container-fluid max-w-700 px-3 mt-3">
+    <div class="nav-tabs-pill mb-3">
+      <button class="nav-link active" id="tab-btn-pending" onclick="switchKadivTab('pending')">
+        <i class="bi bi-hourglass-split me-1"></i> Menunggu (<span id="badge-count-pending">0</span>)
+      </button>
+      <button class="nav-link" id="tab-btn-active" onclick="switchKadivTab('active')">
+        <i class="bi bi-person-workspace me-1"></i> Bekerja (<span id="badge-count-active">0</span>)
+      </button>
+      <button class="nav-link" id="tab-btn-history" onclick="switchKadivTab('history')">
+        <i class="bi bi-clock-history me-1"></i> Riwayat
+      </button>
+    </div>
+
+    <!-- PANE 1: MENUNGGU PERSETUJUAN -->
+    <div id="pane-pending" class="tab-pane-content">
+      <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+        <div>
+          <h6 class="fw-bold mb-0 text-dark">Antrean Persetujuan</h6>
+          <small class="text-muted" id="pending-summary">Memeriksa pengajuan masuk...</small>
+        </div>
+        <button class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" onclick="approveAllPending()">
+          <i class="bi bi-check-all me-1"></i> Setujui Semua (<span id="count-all-badge">0</span>)
+        </button>
+      </div>
+
+      <div id="empty-pending" class="text-center py-5 d-none">
+        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 text-success mb-3" style="width: 60px; height: 60px;">
+          <i class="bi bi-check2-all" style="font-size: 2rem;"></i>
+        </div>
+        <h6 class="fw-bold text-dark mb-1">Semua Pengajuan Selesai</h6>
+        <p class="text-muted small mb-0">Tidak ada staf yang menunggu persetujuan saat ini.</p>
+      </div>
+
+      <div id="pending-list-container"></div>
+    </div>
+
+    <!-- PANE 2: SEDANG BEKERJA -->
+    <div id="pane-active" class="tab-pane-content d-none">
+      <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+        <div>
+          <h6 class="fw-bold mb-0 text-dark">Staf Sedang Bertugas Hari Ini</h6>
+          <small class="text-muted" id="active-summary">Memuat sesi aktif...</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" onclick="openScannerModal()">
+          <i class="bi bi-qr-code-scan me-1"></i> Scan Hadir
+        </button>
+      </div>
+
+      <div id="empty-active" class="text-center py-5 d-none">
+        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 text-secondary mb-3" style="width: 60px; height: 60px;">
+          <i class="bi bi-moon-stars" style="font-size: 2rem;"></i>
+        </div>
+        <h6 class="fw-bold text-dark mb-1">Belum Ada Sesi Kerja Berjalan</h6>
+        <p class="text-muted small mb-0">Staf yang telah disetujui akan muncul di sini.</p>
+      </div>
+
+      <div id="active-list-container"></div>
+    </div>
+
+    <!-- PANE 3: RIWAYAT ABSENSI -->
+    <div id="pane-history" class="tab-pane-content d-none">
+      <div class="card border-0 shadow-sm rounded-4 mb-3">
+        <div class="card-body p-3">
+          <div class="row g-2 align-items-center">
+            <div class="col-md-7">
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" id="search-history" placeholder="Cari nama staf / catatan..." onkeyup="filterHistoryTable()">
+              </div>
+            </div>
+            <div class="col-md-5">
+              <div class="input-group">
+                <span class="input-group-text bg-light"><i class="bi bi-calendar3 text-muted"></i></span>
+                <input type="date" class="form-control" id="filter-history-date" onchange="handleHistoryDateChange(this.value)">
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Toolbar Arsip Telegram -->
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-2 mt-2 border-top">
+            <div class="small text-muted"><i class="bi bi-archive me-1 text-primary"></i><strong>Arsip Telegram:</strong></div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold shadow-xs" onclick="kirimArsipPekanIniKadiv()">
+                <i class="bi bi-send-check me-1"></i> Rekap Pekanan
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold shadow-xs" onclick="kirimArsipBulanIniKadiv()">
+                <i class="bi bi-calendar-month me-1"></i> Rekap Bulanan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" style="font-size: 13px;" id="table-history-kadiv">
+            <thead class="bg-light text-muted small">
+              <tr>
+                <th class="ps-3 py-2.5">Tanggal</th>
+                <th class="py-2.5">Waktu / Shift</th>
+                <th class="py-2.5">Jam Masuk</th>
+                <th class="py-2.5">Jam Keluar</th>
+                <th class="py-2.5">Nama Staff</th>
+                <th class="py-2.5">Kehadiran</th>
+                <th class="py-2.5">Catatan</th>
+                <th class="py-2.5">Status</th>
+                <th class="py-2.5">Divalidasi Oleh</th>
+                <th class="pe-3 py-2.5 text-center">Aksi WA</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-history-kadiv">
+              <tr><td colspan="10" class="text-center py-4 text-muted">Memuat data riwayat...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 📷 MODAL SCANNER BARCODE KADIV -->
+  <!-- ========================================== -->
+  <div class="modal fade" id="modal-scanner" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+        <div class="modal-header bg-dark text-white border-0 py-3">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-qr-code-scan text-warning fs-5"></i>
+            <h6 class="modal-title fw-bold mb-0">Scan Barcode / QR Hadir Staf</h6>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-light rounded-circle p-1.5" onclick="toggleScannerFlashlight()" title="Nyalakan Lampu Flash">
+              <i class="bi bi-lightning-charge-fill"></i>
+            </button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="stopScannerCamera()"></button>
+          </div>
+        </div>
+        <div class="modal-body p-3 bg-dark text-white text-center">
+          <div id="scanner-viewport"></div>
+          <div id="scanner-loading-text" class="text-white-50 small my-2">
+            <div class="spinner-border spinner-border-sm text-warning me-1"></div> Mengaktifkan kamera...
+          </div>
+
+          <!-- Input Barcode Gun Fisik -->
+          <div class="mt-3 text-start bg-secondary bg-opacity-25 p-2.5 rounded-3">
+            <label class="form-label text-white-50 small mb-1"><i class="bi bi-upc-scan me-1 text-warning"></i> Input Scanner Barcode USB / Bluetooth:</label>
+            <form onsubmit="handleManualScannerInput(event)">
+              <div class="input-group input-group-sm">
+                <input type="text" id="manual-barcode-input" class="form-control bg-dark text-white border-secondary" placeholder="Tembak barcode / ketik ID Staff..." autocomplete="off">
+                <button class="btn btn-warning fw-bold" type="submit">Proses</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 🚫 MODAL TOLAK ABSENSI -->
+  <!-- ========================================== -->
+  <div class="modal fade" id="modal-reject" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow-lg">
+        <div class="modal-header bg-danger text-white border-0 py-3">
+          <h6 class="modal-title fw-bold mb-0"><i class="bi bi-x-circle-fill me-1"></i> Tolak / Tetapkan Status Absensi</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          <input type="hidden" id="reject-id">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-dark">Nama Staff:</label>
+            <div class="fw-bold text-danger" id="reject-staff-name">-</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-dark">Tetapkan Sebagai:</label>
+            <select class="form-select form-select-sm" id="reject-status-select">
+              <option value="Alpa">❌ Alpa / Mangkir</option>
+              <option value="Sakit">🤒 Sakit</option>
+              <option value="Izin">📩 Izin</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-dark">Alasan / Catatan Penolakan:</label>
+            <textarea class="form-control form-control-sm" id="reject-note" rows="3" placeholder="Tuliskan catatan alasan penolakan..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-0 p-3 pt-0">
+          <button type="button" class="btn btn-sm btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-sm btn-danger rounded-pill px-4 fw-bold" onclick="submitRejection()">Konfirmasi Penolakan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast -->
+  <div id="toast-quick" class="d-none">
+    <i class="bi bi-info-circle-fill text-warning fs-5" id="toast-icon"></i>
+    <span id="toast-msg">Notifikasi</span>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // ========================================================
+    // ⚙️ KONFIGURASI BACKEND API GOOGLE APPS SCRIPT
+    // ========================================================
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwELxlXYsX7G_o4A25hi_5bd7dsEO3wIdFJXxmIWV4393O7CiRXyA19tDEFTuYrtmQb/exec";
+    const SECRET_PIN = "010387";
+
+    let currentPin = "";
+    let kadivData = { pending: [], active: [], history: [], isAutoApprove: false };
+    let currentActiveTab = "pending";
+    let filterDateHistory = new Date().toISOString().split('T')[0];
+    let syncInterval = null;
+    let html5QrCode = null;
+    let isTorchOn = false;
+    let isProcessingScan = false;
+    let deferredPrompt = null;
+
+    // ========================================================
+    // 📱 PWA SERVICE WORKER & INSTALL BANNER
+    // ========================================================
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          console.log('PWA Service Worker registered:', reg);
+        }).catch(err => console.log('SW registration error:', err));
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'flex';
+    });
+
+    function installPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            dismissPwaBanner();
+          }
+          deferredPrompt = null;
+        });
+      }
+    }
+
+    function dismissPwaBanner() {
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    // ========================================================
+    // 🔒 PIN LOCK SYSTEM
+    // ========================================================
+    function initSecurity() {
+      const isBypassed = localStorage.getItem('kadiv_pwa_pin_bypass') === 'true';
+      if (isBypassed) {
+        unlockApp();
+      } else {
+        showPinScreen();
+      }
+    }
+
+    function showPinScreen() {
+      currentPin = "";
+      updatePinDots();
+      document.getElementById('pin-lock-screen').style.display = 'flex';
+      document.getElementById('pin-error-msg').classList.add('d-none');
+    }
+
+    function lockPinScreen() {
+      localStorage.removeItem('kadiv_pwa_pin_bypass');
+      showPinScreen();
+    }
+
+    function pressPin(num) {
+      if (currentPin.length < 6) {
+        currentPin += num;
+        updatePinDots();
+        if (currentPin.length === 6) {
+          verifyPin();
+        }
+      }
+    }
+
+    function backspacePin() {
+      if (currentPin.length > 0) {
+        currentPin = currentPin.slice(0, -1);
+        updatePinDots();
+      }
+    }
+
+    function clearPin() {
+      currentPin = "";
+      updatePinDots();
+    }
+
+    function updatePinDots() {
+      for (let i = 0; i < 6; i++) {
+        const dot = document.getElementById('dot-' + i);
+        if (dot) {
+          if (i < currentPin.length) dot.classList.add('filled');
+          else dot.classList.remove('filled');
+        }
+      }
+    }
+
+    function verifyPin() {
+      if (currentPin === SECRET_PIN) {
+        const remember = document.getElementById('check-remember-pin').checked;
+        if (remember) {
+          localStorage.setItem('kadiv_pwa_pin_bypass', 'true');
+        }
+        unlockApp();
+      } else {
+        const err = document.getElementById('pin-error-msg');
+        if (err) err.classList.remove('d-none');
+        clearPin();
+      }
+    }
+
+    function unlockApp() {
+      document.getElementById('pin-lock-screen').style.display = 'none';
+      startApp();
+    }
+
+    // ========================================================
+    // 🚀 INTI APLIKASI & API ENGINE (JSONP / FETCH FALLBACK)
+    // ========================================================
+    function startApp() {
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      document.getElementById('filter-history-date').value = filterDateHistory;
+      fetchKadivData();
+
+      if (!syncInterval) {
+        syncInterval = setInterval(() => { fetchKadivData(true); }, 12000);
+      }
+    }
+
+    // Pemanggil API GAS dengan dukungan JSONP & CORS Fetch
+    function callGasApi(apiName, params, callback) {
+      const cbName = 'gas_cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+      let query = `api=${encodeURIComponent(apiName)}&callback=${cbName}`;
+      
+      if (params) {
+        for (const k in params) {
+          if (params[k] !== undefined && params[k] !== null) {
+            query += `&${encodeURIComponent(k)}=${encodeURIComponent(typeof params[k] === 'object' ? JSON.stringify(params[k]) : params[k])}`;
+          }
+        }
+      }
+
+      window[cbName] = function(res) {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        if (callback) callback(res);
+      };
+
+      const script = document.createElement('script');
+      script.src = `${GAS_ENDPOINT}?${query}`;
+      script.onerror = function() {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        // Fallback ke POST Fetch jika JSONP diblokir
+        fetch(GAS_ENDPOINT, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api: apiName, ...params })
+        }).then(() => {
+          if (callback) callback({ success: true, message: 'Permintaan terkirim' });
+        }).catch(err => {
+          if (callback) callback({ success: false, message: err.message });
+        });
+      };
+      document.body.appendChild(script);
+    }
+
+    function fetchKadivData(isSilent) {
+      const syncStatus = document.getElementById('sync-status');
+      if (!isSilent && syncStatus) syncStatus.textContent = "Memperbarui...";
+
+      callGasApi('kadiv_dashboard', { targetDate: filterDateHistory }, function(res) {
+        if (syncStatus) syncStatus.textContent = "Sinkronisasi Otomatis";
+        if (res && res.success) {
+          kadivData = res;
+          renderAllData();
+        }
+      });
+    }
+
+    function renderAllAll() {
+      renderAllData();
+    }
+
+    function renderAllData() {
+      // Toggle auto approve
+      const toggle = document.getElementById('auto-approve-toggle');
+      const label = document.getElementById('auto-approve-label');
+      if (toggle) toggle.checked = kadivData.isAutoApprove;
+      if (label) label.textContent = kadivData.isAutoApprove ? "Otomatis" : "Manual";
+
+      // Badges
+      const pCount = (kadivData.pending || []).length;
+      const aCount = (kadivData.active || []).length;
+      document.getElementById('badge-count-pending').textContent = pCount;
+      document.getElementById('count-all-badge').textContent = pCount;
+      document.getElementById('badge-count-active').textContent = aCount;
+
+      renderPendingList();
+      renderActiveList();
+      renderHistoryTable();
+    }
+
+    // ========================================================
+    // ⏳ TAB 1: RENDER ANTREAN MENUNGGU
+    // ========================================================
+    function renderPendingList() {
+      const container = document.getElementById('pending-list-container');
+      const empty = document.getElementById('empty-pending');
+      const list = kadivData.pending || [];
+
+      if (list.length === 0) {
+        empty.classList.remove('d-none');
+        container.innerHTML = '';
+        document.getElementById('pending-summary').textContent = "Tidak ada staf menunggu.";
+        return;
+      }
+
+      empty.classList.add('d-none');
+      document.getElementById('pending-summary').textContent = `${list.length} staf membutuhkan persetujuan.`;
+
+      let html = '';
+      list.forEach(item => {
+        const id = item.ID_AbsenStaff;
+        const name = item.Nama_Staff || 'Staff';
+        const shift = item.Waktu_Kerja || (item.Waktu ? item.Waktu.split('|')[0] : 'Shift Reguler');
+        const jam = item.Jam_Masuk || (item.Waktu && item.Waktu.split('|').length > 1 ? item.Waktu.split('|')[1] : '-');
+        const tgl = item.Tanggal || '';
+
+        html += `
+          <div class="approval-card border-start border-4 border-warning">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h6 class="fw-bold text-dark mb-0">${escapeHtml(name)}</h6>
+                <div class="text-muted small">${escapeHtml(shift)} • <span class="text-dark fw-semibold">${escapeHtml(jam)}</span></div>
+              </div>
+              <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-25 px-2.5 py-1 rounded-pill">
+                <i class="bi bi-hourglass-split me-1"></i> Menunggu
+              </span>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-sm btn-success rounded-pill flex-grow-1 fw-bold py-2 shadow-sm" onclick="approveSingleAbsen('${id}', '${escapeHtml(name)}')">
+                <i class="bi bi-check-lg me-1"></i> Setujui
+              </button>
+              <button class="btn btn-sm btn-outline-danger rounded-pill px-3 py-2 fw-semibold" onclick="openRejectModal('${id}', '${escapeHtml(name)}')">
+                <i class="bi bi-x-lg me-1"></i> Tolak
+              </button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    // ========================================================
+    // 🟢 TAB 2: RENDER STAF SEDANG BERTUGAS (LIVE WORK PROGRESS)
+    // ========================================================
+    function renderActiveList() {
+      const container = document.getElementById('active-list-container');
+      const empty = document.getElementById('empty-active');
+      const list = kadivData.active || [];
+
+      if (list.length === 0) {
+        empty.classList.remove('d-none');
+        container.innerHTML = '';
+        document.getElementById('active-summary').textContent = "Tidak ada staf bertugas.";
+        return;
+      }
+
+      empty.classList.add('d-none');
+      document.getElementById('active-summary').textContent = `${list.length} staf aktif bertugas.`;
+
+      let html = '';
+      list.forEach(item => {
+        const name = item.Nama_Staff || 'Staff';
+        const shift = item.Waktu_Kerja || 'Shift Harian';
+        const jamMasuk = item.Jam_Masuk || (item.Waktu ? item.Waktu.split('|')[1] : '07:00');
+        const validator = item.Divalidasi_Oleh || 'Kadiv';
+
+        html += `
+          <div class="approval-card border-start border-4 border-success">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h6 class="fw-bold text-dark mb-0">${escapeHtml(name)}</h6>
+                <div class="text-muted small">${escapeHtml(shift)} • Masuk: <span class="text-success fw-bold">${escapeHtml(jamMasuk)}</span></div>
+              </div>
+              <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 px-2.5 py-1 rounded-pill">
+                <span class="pulse-dot me-1"></span> Bertugas
+              </span>
+            </div>
+            
+            <div class="progress my-2" style="height: 6px; border-radius: 10px; background: #e2e8f0;">
+              <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar" style="width: 65%"></div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-2 small">
+              <span class="text-muted" style="font-size: 11px;"><i class="bi bi-shield-check text-success me-1"></i> ${escapeHtml(validator)}</span>
+              <button class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-0.5" style="font-size: 11px;" onclick="kirimWaKadivDirect('${escapeHtml(name)}', '${escapeHtml(shift)}', '${escapeHtml(jamMasuk)}')">
+                <i class="bi bi-whatsapp me-1"></i> WA
+              </button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    // ========================================================
+    // 📋 TAB 3: RENDER RIWAYAT ABSENSI
+    // ========================================================
+    function renderHistoryTable() {
+      const tbody = document.getElementById('tbody-history-kadiv');
+      const list = kadivData.history || [];
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Tidak ada data riwayat pada tanggal terpilih.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      list.forEach(r => {
+        const id = r.ID_AbsenStaff;
+        const tgl = r.Tanggal || '';
+        const shift = r.Waktu_Kerja || (r.Waktu ? r.Waktu.split('|')[0] : '-');
+        const masuk = r.Jam_Masuk || (r.Waktu && r.Waktu.split('|').length > 1 ? r.Waktu.split('|')[1] : '-');
+        const keluar = r.Jam_Keluar ? (r.Jam_Keluar.includes('|') ? r.Jam_Keluar.split('|')[0] : r.Jam_Keluar) : '-';
+        const nama = r.Nama_Staff || '-';
+        const kehadiran = r.Status || 'Hadir';
+        const catatan = r.Catatan || '-';
+        const validasi = r.Status_Validasi || 'Disetujui';
+        const validator = r.Divalidasi_Oleh || 'Kadiv';
+
+        let badgeStatus = '<span class="badge bg-success">Disetujui</span>';
+        if (validasi === 'Menunggu') badgeStatus = '<span class="badge bg-warning text-dark">Menunggu</span>';
+        else if (validasi === 'Ditolak') badgeStatus = '<span class="badge bg-danger">Ditolak</span>';
+
+        html += `
+          <tr>
+            <td class="ps-3 fw-semibold text-muted">${escapeHtml(tgl)}</td>
+            <td>${escapeHtml(shift)}</td>
+            <td class="fw-bold text-success">${escapeHtml(masuk)}</td>
+            <td class="text-muted">${escapeHtml(keluar)}</td>
+            <td class="fw-bold text-dark">${escapeHtml(nama)}</td>
+            <td><span class="badge bg-light text-dark border">${escapeHtml(kehadiran)}</span></td>
+            <td class="text-muted small">${escapeHtml(catatan)}</td>
+            <td>${badgeStatus}</td>
+            <td class="small text-muted">${escapeHtml(validator)}</td>
+            <td class="pe-3 text-center">
+              <button class="btn btn-xs btn-outline-success rounded-circle p-1" onclick="kirimWaKadivDirect('${escapeHtml(nama)}', '${escapeHtml(shift)}', '${escapeHtml(masuk)}')">
+                <i class="bi bi-whatsapp"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function filterHistoryTable() {
+      const q = (document.getElementById('search-history').value || '').toLowerCase();
+      const rows = document.querySelectorAll('#tbody-history-kadiv tr');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    function handleHistoryDateChange(val) {
+      filterDateHistory = val;
+      fetchKadivData();
+    }
+
+    // ========================================================
+    // ⚡ AKSI PERSETUJUAN & PENOLAKAN
+    // ========================================================
+    function approveSingleAbsen(id, name) {
+      showToast(`Menyetujui absensi ${name}...`, 'info');
+      callGasApi('kadiv_validate', {
+        id: id,
+        status: 'Disetujui',
+        validatorName: 'Kadiv (PWA 1-Klik)',
+        validatorId: 'STF-KADIV',
+        finalStatus: 'Hadir'
+      }, function(res) {
+        if (res && res.success) {
+          playSuccessBeep();
+          showToast(`✅ Absensi ${name} berhasil disetujui!`, 'success');
+          fetchKadivData(true);
+        } else {
+          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+        }
+      });
+    }
+
+    function approveAllPending() {
+      const list = kadivData.pending || [];
+      if (list.length === 0) {
+        showToast('Tidak ada antrean absensi untuk disetujui.', 'warning');
+        return;
+      }
+      if (!confirm(`Setujui seluruh ${list.length} pengajuan staf sekaligus?`)) return;
+
+      const ids = list.map(item => item.ID_AbsenStaff);
+      showToast(`Memproses ${ids.length} pengajuan...`, 'info');
+
+      callGasApi('kadiv_validate_massal', {
+        ids: ids,
+        status: 'Disetujui',
+        validatorName: 'Kadiv (PWA Bulk)',
+        validatorId: 'STF-KADIV'
+      }, function(res) {
+        if (res && res.success) {
+          playSuccessBeep();
+          showToast(`✅ Seluruh ${ids.length} pengajuan disetujui!`, 'success');
+          fetchKadivData(true);
+        } else {
+          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+        }
+      });
+    }
+
+    function openRejectModal(id, name) {
+      document.getElementById('reject-id').value = id;
+      document.getElementById('reject-staff-name').textContent = name;
+      document.getElementById('reject-note').value = '';
+      const modal = new bootstrap.Modal(document.getElementById('modal-reject'));
+      modal.show();
+    }
+
+    function submitRejection() {
+      const id = document.getElementById('reject-id').value;
+      const status = document.getElementById('reject-status-select').value;
+      const note = document.getElementById('reject-note').value;
+
+      showToast('Menyimpan penolakan...', 'info');
+      bootstrap.Modal.getInstance(document.getElementById('modal-reject')).hide();
+
+      callGasApi('kadiv_validate', {
+        id: id,
+        status: 'Ditolak',
+        validatorName: 'Kadiv (PWA)',
+        validatorId: 'STF-KADIV',
+        finalStatus: status,
+        rejectionNote: note
+      }, function(res) {
+        if (res && res.success) {
+          showToast(`Absensi ditolak dan ditetapkan sebagai ${status}.`, 'success');
+          fetchKadivData(true);
+        } else {
+          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+        }
+      });
+    }
+
+    function toggleAutoApproval(enabled) {
+      const label = document.getElementById('auto-approve-label');
+      if (label) label.textContent = enabled ? "Otomatis" : "Manual";
+      showToast(`Mengubah mode ke: ${enabled ? 'Otomatis' : 'Manual'}...`, 'info');
+
+      callGasApi('kadiv_toggle_auto', { enabled: enabled }, function(res) {
+        if (res && res.success) {
+          showToast(`Mode persetujuan berhasil diubah ke: ${enabled ? 'Otomatis' : 'Manual'}`, 'success');
+        } else {
+          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+        }
+      });
+    }
+
+    // ========================================================
+    // 📷 BARCODE SCANNER (KAMERA & USB SCANNER GUN)
+    // ========================================================
+    function openScannerModal() {
+      const modalEl = document.getElementById('modal-scanner');
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+      setTimeout(startScannerCamera, 400);
+    }
+
+    function startScannerCamera() {
+      const loading = document.getElementById('scanner-loading-text');
+      if (loading) loading.classList.remove('d-none');
+
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("scanner-viewport");
+      }
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 15, qrbox: { width: 240, height: 240 } },
+        function onScanSuccess(decodedText) {
+          if (isProcessingScan) return;
+          processBarcodeData(decodedText);
+        },
+        function onScanFailure(err) {}
+      ).then(() => {
+        if (loading) loading.classList.add('d-none');
+      }).catch(err => {
+        if (loading) loading.innerHTML = '<span class="text-danger small"><i class="bi bi-camera-video-off me-1"></i> Kamera tidak aktif. Gunakan scanner gun di bawah.</span>';
+      });
+    }
+
+    function stopScannerCamera() {
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+      }
+    }
+
+    function toggleScannerFlashlight() {
+      if (html5QrCode && html5QrCode.isScanning) {
+        isTorchOn = !isTorchOn;
+        try {
+          html5QrCode.applyVideoConstraints({ advanced: [{ torch: isTorchOn }] });
+          showToast(isTorchOn ? '🔦 Lampu Flash Menyala' : 'Lampu Flash Mati', 'info');
+        } catch(e) {
+          showToast('Lampu flash tidak didukung perangkat.', 'warning');
+        }
+      }
+    }
+
+    function handleManualScannerInput(e) {
+      if (e) e.preventDefault();
+      const val = document.getElementById('manual-barcode-input').value;
+      if (val && val.trim() !== '') {
+        processBarcodeData(val.trim());
+      }
+    }
+
+    function processBarcodeData(code) {
+      isProcessingScan = true;
+      playSuccessBeep();
+      showToast(`Memvalidasi barcode: ${code}...`, 'info');
+
+      callGasApi('kadiv_scan_approve', {
+        barcode: code,
+        validatorName: 'Kadiv (Scan Barcode PWA)',
+        validatorId: 'STF-KADIV'
+      }, function(res) {
+        setTimeout(() => { isProcessingScan = false; }, 2000);
+        if (res && res.success) {
+          playSuccessBeep();
+          showToast(`✅ ${res.message}`, 'success');
+          bootstrap.Modal.getInstance(document.getElementById('modal-scanner')).hide();
+          stopScannerCamera();
+          fetchKadivData(true);
+        } else {
+          showToast(`Gagal: ${res ? res.message : 'Barcode tidak cocok'}`, 'danger');
+        }
+      });
+    }
+
+    // ========================================================
+    // 📊 ARSIP TELEGRAM ACTIONS
+    // ========================================================
+    function kirimArsipPekanIniKadiv() {
+      if (!confirm('Kirim arsip rekap absensi pekan ini ke grup Telegram dan japri Kadiv?')) return;
+      showToast('Menyiapkan dan mengirim arsip rekap pekanan ke Telegram...', 'info');
+
+      callGasApi('kadiv_archive_weekly', {}, function(res) {
+        if (res && res.success) showToast(`✅ ${res.message}`, 'success');
+        else showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+      });
+    }
+
+    function kirimArsipBulanIniKadiv() {
+      if (!confirm('Kirim arsip laporan bulanan absensi staf ke grup Telegram dan japri Kadiv?')) return;
+      showToast('Menyiapkan dan mengirim arsip laporan bulanan ke Telegram...', 'info');
+
+      callGasApi('kadiv_archive_monthly', {}, function(res) {
+        if (res && res.success) showToast(`✅ ${res.message}`, 'success');
+        else showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+      });
+    }
+
+    // ========================================================
+    // 🛠️ UTILITIES & AUDIO BEEP
+    // ========================================================
+    function switchKadivTab(tabId) {
+      currentActiveTab = tabId;
+      document.querySelectorAll('.tab-pane-content').forEach(p => p.classList.add('d-none'));
+      document.querySelectorAll('.nav-tabs-pill .nav-link').forEach(b => b.classList.remove('active'));
+
+      document.getElementById('pane-' + tabId).classList.remove('d-none');
+      document.getElementById('tab-btn-' + tabId).classList.add('active');
+    }
+
+    function playSuccessBeep() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15); // A6
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+      } catch(e) {}
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
+      const days = ['Ahad', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const dateStr = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+
+      const elTime = document.getElementById('clock-time');
+      const elDate = document.getElementById('clock-gregorian');
+      if (elTime) elTime.innerHTML = `<i class="bi bi-clock text-warning me-1"></i>${timeStr}`;
+      if (elDate) elDate.innerHTML = `<i class="bi bi-calendar3 text-success me-1"></i>${dateStr}`;
+    }
+
+    function kirimWaKadivDirect(nama, shift, jamMasuk) {
+      const pesan = `Assalamu'alaikum Warahmatullahi Wabarakatuh, Ustadz ${nama}.\nKehadiran antum untuk ${shift} (Masuk: ${jamMasuk}) telah divalidasi oleh Kepala Divisi Kesantrian.\nSelamat bertugas, semoga Allah memberkahi ikhtiar antum.`;
+      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(pesan), '_blank');
+    }
+
+    function showToast(msg, type) {
+      const toastEl = document.getElementById('toast-quick');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastIcon = document.getElementById('toast-icon');
+      if (!toastEl) return;
+
+      toastMsg.textContent = msg;
+      if (type === 'success') toastIcon.className = 'bi bi-check-circle-fill text-success fs-5';
+      else if (type === 'danger') toastIcon.className = 'bi bi-exclamation-octagon-fill text-danger fs-5';
+      else toastIcon.className = 'bi bi-info-circle-fill text-warning fs-5';
+
+      toastEl.classList.remove('d-none');
+      setTimeout(() => { toastEl.classList.add('d-none'); }, 3500);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+
+    // Jalankan inisialisasi keamanan saat startup
+    document.addEventListener('DOMContentLoaded', initSecurity);
+  </script>
+</body>
+</html>
