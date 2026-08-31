@@ -311,13 +311,12 @@
             <span class="d-none d-sm-inline">Scan</span>
           </button>
 
-          <!-- Toggle Auto Approval -->
-          <div class="form-check form-switch m-0 d-flex align-items-center gap-1 bg-light border rounded-pill px-2 py-1" title="Sakelar Persetujuan Otomatis / Manual">
-            <input class="form-check-input ms-0" type="checkbox" role="switch" id="auto-approve-toggle" onchange="toggleAutoApproval(this.checked)" style="cursor: pointer;">
-            <label class="form-check-label small fw-semibold text-dark me-1" for="auto-approve-toggle" id="auto-approve-label" style="font-size: 11px; cursor: pointer;">
-              Manual
-            </label>
-          </div>
+          <!-- Button Atur Jadwal Auto-Approve -->
+          <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-1.5 fw-bold d-flex align-items-center gap-1 shadow-xs" onclick="openScheduleModalPwa()" title="Atur Jadwal Auto-Approve Shift">
+            <i class="bi bi-robot"></i>
+            <span id="auto-approve-label" style="font-size: 11px;">Auto Shift</span>
+            <i class="bi bi-gear-fill text-muted" style="font-size: 9px;"></i>
+          </button>
 
           <!-- Lock Button -->
           <button class="btn btn-sm btn-light border rounded-circle p-2" onclick="lockPinScreen()" title="Kunci Aplikasi">
@@ -326,8 +325,11 @@
         </div>
       </div>
 
-      <!-- Real-time Clock Info -->
-      <div class="d-flex align-items-center justify-content-between mt-2 pt-2 border-top text-muted" style="font-size: 11.5px;">
+      <!-- Real-time Clock Info & Active Schedule Badge -->
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2 pt-2 border-top text-muted" style="font-size: 11.5px;">
+        <div class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 cursor-pointer" onclick="openScheduleModalPwa()" id="pwa-schedule-badge">
+          <i class="bi bi-sliders me-1"></i><span id="pwa-schedule-label">Auto: Shift Siang & Malam</span>
+        </div>
         <span id="clock-gregorian"><i class="bi bi-calendar3 text-success me-1"></i>Memuat...</span>
         <span id="clock-time" class="fw-bold text-dark font-monospace"><i class="bi bi-clock text-warning me-1"></i>00:00:00</span>
       </div>
@@ -598,6 +600,83 @@
     </div>
   </div>
 
+  <!-- ⚙️ MODAL PENGATURAN AUTO-APPROVE SHIFT & JADWAL (PWA) -->
+  <div class="modal fade" id="modal-schedule-pwa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+        <div class="modal-header bg-success text-white border-0 py-3">
+          <div class="d-flex align-items-center gap-2">
+            <div class="bg-white text-success rounded-circle p-1.5 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+              <i class="bi bi-robot fs-5"></i>
+            </div>
+            <div>
+              <h6 class="modal-title fw-bold mb-0">Pengaturan Auto-Approve Shift</h6>
+              <div style="font-size: 11px; opacity: 0.9;">Tentukan kapan persetujuan otomatis berjalan</div>
+            </div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          
+          <label class="form-label small fw-bold text-dark mb-1.5">1. Kebijakan Persetujuan:</label>
+          <div class="d-flex flex-column gap-2 mb-3">
+            <label class="p-2.5 rounded-3 border bg-white cursor-pointer d-flex align-items-start gap-2 mb-0">
+              <input class="form-check-input mt-1" type="radio" name="pwa_sched_mode" id="pwa-mode-custom" value="custom" checked onchange="togglePwaSchedSection('custom')">
+              <div>
+                <strong class="d-block text-dark small">Kustom Sesuai Shift Pilihan</strong>
+                <span class="text-muted" style="font-size: 11px;">Hanya shift/jam tertentu yang disetujui otomatis.</span>
+              </div>
+            </label>
+            <label class="p-2.5 rounded-3 border bg-white cursor-pointer d-flex align-items-start gap-2 mb-0">
+              <input class="form-check-input mt-1" type="radio" name="pwa_sched_mode" id="pwa-mode-manual" value="all_manual" onchange="togglePwaSchedSection('all_manual')">
+              <div>
+                <strong class="d-block text-danger small">Semua Shift Manual</strong>
+                <span class="text-muted" style="font-size: 11px;">Semua staf wajib divalidasi oleh Kadiv.</span>
+              </div>
+            </label>
+            <label class="p-2.5 rounded-3 border bg-white cursor-pointer d-flex align-items-start gap-2 mb-0">
+              <input class="form-check-input mt-1" type="radio" name="pwa_sched_mode" id="pwa-mode-auto" value="all_auto" onchange="togglePwaSchedSection('all_auto')">
+              <div>
+                <strong class="d-block text-success small">Semua Shift Otomatis (24/7)</strong>
+                <span class="text-muted" style="font-size: 11px;">Semua staf langsung disetujui sistem 24 jam.</span>
+              </div>
+            </label>
+          </div>
+
+          <div id="pwa-custom-section">
+            <div class="p-3 bg-light rounded-3 border mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label small fw-bold text-dark mb-0">2. Centang Shift yang Di-Auto-kan:</label>
+                <button type="button" class="btn btn-xs btn-link p-0 text-decoration-none" onclick="toggleAllPwaShifts()">Pilih Semua</button>
+              </div>
+              <div class="row g-2" id="pwa-shift-checkboxes">
+                <!-- Shift list -->
+              </div>
+            </div>
+
+            <div class="p-3 bg-light rounded-3 border mb-2">
+              <label class="form-label small fw-bold text-dark mb-1">3. Hari Berlakunya Auto-Approve:</label>
+              <div class="d-flex flex-wrap gap-1.5" id="pwa-days-container">
+                <label class="bg-white px-2 py-1 rounded border small"><input type="checkbox" id="pwa-day-1" value="1" checked class="me-1">Sen</label>
+                <label class="bg-white px-2 py-1 rounded border small"><input type="checkbox" id="pwa-day-2" value="2" checked class="me-1">Sel</label>
+                <label class="bg-white px-2 py-1 rounded border small"><input type="checkbox" id="pwa-day-3" value="3" checked class="me-1">Rab</label>
+                <label class="bg-white px-2 py-1 rounded border small"><input type="checkbox" id="pwa-day-4" value="4" checked class="me-1">Kam</label>
+                <label class="bg-white px-2 py-1 rounded border small"><input type="checkbox" id="pwa-day-5" value="5" checked class="me-1">Jum</label>
+                <label class="bg-white px-2 py-1 rounded border small"><input type="checkbox" id="pwa-day-6" value="6" checked class="me-1">Sab</label>
+                <label class="bg-white px-2 py-1 rounded border small"><input type="checkbox" id="pwa-day-0" value="0" checked class="me-1">Ahd</label>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer border-0 p-3 pt-0">
+          <button type="button" class="btn btn-sm btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-sm btn-success rounded-pill px-4 fw-bold shadow-sm" onclick="saveSchedulePwa()"><i class="bi bi-check-circle me-1"></i> Simpan Jadwal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Floating Toast -->
   <div id="toast-quick" class="d-none">
     <i class="bi bi-info-circle-fill text-warning fs-5" id="toast-icon"></i>
@@ -806,11 +885,10 @@
     }
 
     function renderAllData() {
-      // Toggle auto approve
-      const toggle = document.getElementById('auto-approve-toggle');
-      const label = document.getElementById('auto-approve-label');
-      if (toggle) toggle.checked = kadivData.isAutoApprove;
-      if (label) label.textContent = kadivData.isAutoApprove ? "Otomatis" : "Manual";
+      // Schedule config badge
+      if (kadivData.scheduleConfig) {
+        updatePwaScheduleBadgeUI(kadivData.scheduleConfig);
+      }
 
       // Badges
       const pCount = (kadivData.pending || []).length;
@@ -822,6 +900,125 @@
       renderPendingList();
       renderActiveList();
       renderHistoryTable();
+    }
+
+    function updatePwaScheduleBadgeUI(cfg) {
+      if (!cfg) return;
+      const label = document.getElementById('auto-approve-label');
+      const badge = document.getElementById('pwa-schedule-label');
+
+      if (cfg.mode === 'all_manual') {
+        if (label) label.textContent = "Manual";
+        if (badge) badge.textContent = "Semua Shift Manual";
+      } else if (cfg.mode === 'all_auto') {
+        if (label) label.textContent = "Auto 24/7";
+        if (badge) badge.textContent = "Semua Shift Otomatis";
+      } else {
+        const shifts = cfg.autoShifts || [];
+        if (label) label.textContent = `Auto (${shifts.length})`;
+        if (badge) badge.textContent = shifts.length > 0 ? `Auto: ${shifts.join(', ')}` : 'Shift Khusus';
+      }
+    }
+
+    function openScheduleModalPwa() {
+      const cfg = kadivData.scheduleConfig || {
+        mode: "custom",
+        autoShifts: ["Shift Siang", "Shift Malam", "Siang", "Malam"],
+        autoDays: [0,1,2,3,4,5,6]
+      };
+
+      const mode = cfg.mode || 'custom';
+      if (mode === 'all_manual') document.getElementById('pwa-mode-manual').checked = true;
+      else if (mode === 'all_auto') document.getElementById('pwa-mode-auto').checked = true;
+      else document.getElementById('pwa-mode-custom').checked = true;
+
+      togglePwaSchedSection(mode);
+
+      // Render shifts
+      const container = document.getElementById('pwa-shift-checkboxes');
+      if (container) {
+        container.innerHTML = '';
+        const shiftsToDisplay = (kadivData.allShifts && kadivData.allShifts.length > 0) ? kadivData.allShifts : [
+          { nama: 'Shift Pagi', masuk: '04:00', pulang: '08:00' },
+          { nama: 'Shift Siang', masuk: '12:00', pulang: '16:00' },
+          { nama: 'Shift Sore', masuk: '16:00', pulang: '18:00' },
+          { nama: 'Shift Malam', masuk: '18:00', pulang: '22:00' }
+        ];
+
+        const activeShifts = cfg.autoShifts || [];
+        shiftsToDisplay.forEach((s, idx) => {
+          const sNama = s.nama || s.Nama_Shift || ('Shift ' + (idx + 1));
+          const sJam = (s.masuk || s.Jam_Masuk) ? ` (${s.masuk || s.Jam_Masuk} - ${s.pulang || s.Jam_Pulang})` : '';
+          const isChecked = activeShifts.some(as => as.toLowerCase().includes(sNama.toLowerCase()) || sNama.toLowerCase().includes(as.toLowerCase()));
+
+          const col = document.createElement('div');
+          col.className = 'col-6';
+          col.innerHTML = `
+            <label class="p-2 rounded-3 border bg-white cursor-pointer d-flex align-items-center gap-1.5 mb-0 small">
+              <input type="checkbox" class="pwa-shift-cb" value="${sNama}" ${isChecked ? 'checked' : ''}>
+              <span class="fw-semibold text-dark text-truncate">${sNama}</span>
+            </label>
+          `;
+          container.appendChild(col);
+        });
+      }
+
+      // Render days
+      const days = cfg.autoDays || [0,1,2,3,4,5,6];
+      for (let d = 0; d <= 6; d++) {
+        const dEl = document.getElementById('pwa-day-' + d);
+        if (dEl) dEl.checked = days.includes(d);
+      }
+
+      new bootstrap.Modal(document.getElementById('modal-schedule-pwa')).show();
+    }
+
+    function togglePwaSchedSection(mode) {
+      const sec = document.getElementById('pwa-custom-section');
+      if (sec) sec.style.display = (mode === 'custom' ? 'block' : 'none');
+    }
+
+    function toggleAllPwaShifts() {
+      const cbs = document.querySelectorAll('.pwa-shift-cb');
+      if (cbs.length === 0) return;
+      const anyUnchecked = Array.from(cbs).some(cb => !cb.checked);
+      cbs.forEach(cb => cb.checked = anyUnchecked);
+    }
+
+    function saveSchedulePwa() {
+      const radios = document.getElementsByName('pwa_sched_mode');
+      let mode = 'custom';
+      for (let i = 0; i < radios.length; i++) {
+        if (radios[i].checked) { mode = radios[i].value; break; }
+      }
+
+      const selectedShifts = [];
+      document.querySelectorAll('.pwa-shift-cb:checked').forEach(cb => selectedShifts.push(cb.value));
+
+      const selectedDays = [];
+      for (let d = 0; d <= 6; d++) {
+        const el = document.getElementById('pwa-day-' + d);
+        if (el && el.checked) selectedDays.push(d);
+      }
+
+      const payload = {
+        mode: mode,
+        autoShifts: selectedShifts,
+        autoDays: selectedDays,
+        groupId: (kadivData.scheduleConfig && kadivData.scheduleConfig.groupId) ? kadivData.scheduleConfig.groupId : "-1003813891974"
+      };
+
+      showToast('Menyimpan aturan auto-approve...', 'info');
+      bootstrap.Modal.getInstance(document.getElementById('modal-schedule-pwa')).hide();
+
+      callGasApi('kadiv_save_schedule_config', { config: JSON.stringify(payload) }, function(res) {
+        if (res && res.success) {
+          showToast(`✅ ${res.message}`, 'success');
+          fetchKadivData(true);
+        } else {
+          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
+        }
+      });
     }
 
     // ========================================================
