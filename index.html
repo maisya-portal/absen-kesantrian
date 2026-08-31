@@ -304,18 +304,29 @@
           </div>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-1.5 flex-wrap">
           <!-- Button Scanner Barcode -->
-          <button type="button" class="btn btn-sm btn-warning rounded-pill px-2.5 py-1.5 fw-bold shadow-sm d-flex align-items-center gap-1" onclick="openScannerModal()">
+          <button type="button" class="btn btn-sm btn-warning rounded-pill px-2.5 py-1.5 fw-bold shadow-sm d-flex align-items-center gap-1" onclick="openScannerModal()" title="Scan Barcode / QR Staff">
             <i class="bi bi-qr-code-scan"></i>
             <span class="d-none d-sm-inline">Scan</span>
           </button>
 
           <!-- Button Atur Jadwal Auto-Approve -->
-          <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-1.5 fw-bold d-flex align-items-center gap-1 shadow-xs" onclick="openScheduleModalPwa()" title="Atur Jadwal Auto-Approve Shift">
+          <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2 py-1.5 fw-bold d-flex align-items-center gap-1 shadow-xs" onclick="openScheduleModalPwa()" title="Atur Jadwal Auto-Approve Shift">
             <i class="bi bi-robot"></i>
             <span id="auto-approve-label" style="font-size: 11px;">Auto Shift</span>
-            <i class="bi bi-gear-fill text-muted" style="font-size: 9px;"></i>
+          </button>
+
+          <!-- Button Layar Ganda PWA -->
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1.5 fw-bold d-flex align-items-center gap-1 shadow-xs" onclick="openSecondPwaWindow()" title="Buka Jendela PWA Kedua (Layar Ganda)">
+            <i class="bi bi-window-stack"></i>
+            <span class="d-none d-sm-inline" style="font-size: 11px;">Layar Ganda</span>
+          </button>
+
+          <!-- Button Buka Portal Kesantrian -->
+          <button type="button" class="btn btn-sm btn-primary rounded-pill px-2 py-1.5 fw-bold d-flex align-items-center gap-1 shadow-xs" onclick="openPortalInAppWindow()" title="Buka Portal Induk Kesantrian">
+            <i class="bi bi-grid-fill"></i>
+            <span class="d-none d-sm-inline" style="font-size: 11px;">Portal</span>
           </button>
 
           <!-- Lock Button -->
@@ -1517,6 +1528,25 @@
       return String(str).replace(/[&<>"']/g, function(m) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
       });
+    }
+
+    function openSecondPwaWindow() {
+      const w = 480;
+      const h = 860;
+      const left = Math.max(0, (window.screen.width - w) / 2 + 50);
+      const top = Math.max(0, (window.screen.height - h) / 2);
+      window.open(window.location.href, '_blank', 'popup=yes,menubar=no,toolbar=no,location=no,status=no,width=' + w + ',height=' + h + ',top=' + top + ',left=' + left);
+      showToast('Membuka jendela PWA kedua...', 'success');
+    }
+
+    function openPortalInAppWindow() {
+      const url = "https://script.google.com/macros/s/AKfycbwELxlXYsX7G_o4A25hi_5bd7dsEO3wIdFJXxmIWV4393O7CiRXyA19tDEFTuYrtmQb/exec";
+      const w = 1280;
+      const h = 820;
+      const left = Math.max(0, (window.screen.width - w) / 2);
+      const top = Math.max(0, (window.screen.height - h) / 2);
+      window.open(url, 'PortalKesantrianApp', 'popup=yes,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes,width=' + w + ',height=' + h + ',top=' + top + ',left=' + left);
+      showToast('Membuka Portal Kesantrian di jendela aplikasi...', 'success');
     }
 
     // Jalankan inisialisasi keamanan saat startup
