@@ -813,6 +813,8 @@
       startApp();
     }
 
+    let isFetchingKadivData = false;
+
     // ========================================================
     // 🚀 INTI APLIKASI & API ENGINE (JSONP / FETCH FALLBACK)
     // ========================================================
@@ -821,14 +823,44 @@
       setInterval(updateClock, 1000);
 
       document.getElementById('filter-history-date').value = filterDateHistory;
-      fetchKadivData();
 
-      if (!syncInterval) {
-        syncInterval = setInterval(() => { fetchKadivData(true); }, 12000);
+      // ⚡ INSTANT LOAD: Tampilkan data dari Cache Lokal (0 detik / tanpa delay)
+      try {
+        const cached = localStorage.getItem('kadiv_pwa_cached_data');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && (parsed.pending || parsed.active || parsed.history)) {
+            kadivData = parsed;
+            renderAllData();
+            const syncStatus = document.getElementById('sync-status');
+            if (syncStatus) syncStatus.textContent = "Data Cache Lokal (Sinkronisasi...)";
+          }
+        }
+      } catch (e) {
+        console.warn('Gagal membaca cache lokal:', e);
       }
+
+      // Lakukan pembaruan data segar di latar belakang
+      fetchKadivData(false);
+
+      // Sinkronisasi otomatis setiap 12 detik dengan perlindungan anti-stuck
+      if (!syncInterval) {
+        syncInterval = setInterval(() => {
+          if (!document.hidden) {
+            fetchKadivData(true);
+          }
+        }, 12000);
+      }
+
+      // Auto refresh saat pengguna membuka kembali PWA dari background / minimize
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          fetchKadivData(true);
+        }
+      });
     }
 
-    // Pemanggil API GAS dengan dukungan JSONP & CORS Fetch
+    // Pemanggil API GAS dengan perlindungan Timeout & pembersihan script tag
     function callGasApi(apiName, params, callback) {
       const cbName = 'gas_cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
       let query = `api=${encodeURIComponent(apiName)}&callback=${cbName}`;
@@ -841,41 +873,60 @@
         }
       }
 
+      let isFinished = false;
+      let script = null;
+
+      const cleanup = function() {
+        if (isFinished) return;
+        isFinished = true;
+        clearTimeout(timeoutId);
+        try { delete window[cbName]; } catch(e) { window[cbName] = undefined; }
+        if (script && script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      };
+
+      // Timeout 9 detik agar request tidak macet selamanya jika jaringan tidak stabil
+      const timeoutId = setTimeout(function() {
+        if (!isFinished) {
+          cleanup();
+          if (callback) callback({ success: false, message: 'Waktu koneksi habis (Timeout)' });
+        }
+      }, 9000);
+
       window[cbName] = function(res) {
-        delete window[cbName];
-        if (script.parentNode) script.parentNode.removeChild(script);
+        cleanup();
         if (callback) callback(res);
       };
 
-      const script = document.createElement('script');
+      script = document.createElement('script');
       script.src = `${GAS_ENDPOINT}?${query}`;
+      script.async = true;
       script.onerror = function() {
-        delete window[cbName];
-        if (script.parentNode) script.parentNode.removeChild(script);
-        // Fallback ke POST Fetch jika JSONP diblokir
-        fetch(GAS_ENDPOINT, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ api: apiName, ...params })
-        }).then(() => {
-          if (callback) callback({ success: true, message: 'Permintaan terkirim' });
-        }).catch(err => {
-          if (callback) callback({ success: false, message: err.message });
-        });
+        cleanup();
+        if (callback) callback({ success: false, message: 'Gagal terhubung ke server (Network Error)' });
       };
       document.body.appendChild(script);
     }
 
     function fetchKadivData(isSilent) {
+      if (isFetchingKadivData) return; // Lindungi agar request tidak menumpuk
+      isFetchingKadivData = true;
+
       const syncStatus = document.getElementById('sync-status');
-      if (!isSilent && syncStatus) syncStatus.textContent = "Memperbarui...";
+      if (!isSilent && syncStatus) syncStatus.textContent = "Menghubungkan...";
 
       callGasApi('kadiv_dashboard', { targetDate: filterDateHistory }, function(res) {
-        if (syncStatus) syncStatus.textContent = "Sinkronisasi Otomatis";
-        if (res && res.success) {
+        isFetchingKadivData = false;
+        if (res && res.success && (res.pending !== undefined || res.active !== undefined)) {
           kadivData = res;
+          try {
+            localStorage.setItem('kadiv_pwa_cached_data', JSON.stringify(res));
+          } catch(e) {}
+          if (syncStatus) syncStatus.textContent = "Sinkronisasi Otomatis";
           renderAllData();
+        } else {
+          if (syncStatus) syncStatus.textContent = "Koneksi Tertunda (Mencoba lagi...)";
         }
       });
     }
@@ -1357,15 +1408,40 @@
 
     function startScannerCamera() {
       const loading = document.getElementById('scanner-loading-text');
-      if (loading) loading.classList.remove('d-none');
+      if (loading) {
+        loading.classList.remove('d-none');
+        loading.innerHTML = '<div class="spinner-border spinner-border-sm text-warning me-1"></div> Mengaktifkan kamera cepat...';
+      }
 
       if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("scanner-viewport");
+        // Aktifkan akselerasi hardware native BarcodeDetector bawaan browser
+        html5QrCode = new Html5Qrcode("scanner-viewport", {
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          },
+          verbose: false
+        });
       }
+
+      // Konfigurasi pemindaian berkecepatan tinggi: 25 FPS, dynamic qrbox, dan video constraints optimal
+      const scanConfig = {
+        fps: 25,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const edge = Math.floor(minEdge * 0.85);
+          return { width: Math.max(edge, 220), height: Math.max(edge, 220) };
+        },
+        aspectRatio: 1.0,
+        videoConstraints: {
+          facingMode: "environment",
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 }
+        }
+      };
 
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 15, qrbox: { width: 240, height: 240 } },
+        scanConfig,
         function onScanSuccess(decodedText) {
           if (isProcessingScan) return;
           processBarcodeData(decodedText);
@@ -1374,7 +1450,20 @@
       ).then(() => {
         if (loading) loading.classList.add('d-none');
       }).catch(err => {
-        if (loading) loading.innerHTML = '<span class="text-danger small"><i class="bi bi-camera-video-off me-1"></i> Kamera tidak aktif. Gunakan scanner gun di bawah.</span>';
+        // Fallback jika perangkat tidak mendukung video constraints tertentu
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 20, qrbox: { width: 240, height: 240 } },
+          function onScanSuccess(decodedText) {
+            if (isProcessingScan) return;
+            processBarcodeData(decodedText);
+          },
+          function onScanFailure(err) {}
+        ).then(() => {
+          if (loading) loading.classList.add('d-none');
+        }).catch(err2 => {
+          if (loading) loading.innerHTML = '<span class="text-danger small"><i class="bi bi-camera-video-off me-1"></i> Kamera tidak aktif. Gunakan scanner gun di bawah.</span>';
+        });
       });
     }
 
@@ -1405,20 +1494,28 @@
     }
 
     function processBarcodeData(code) {
+      if (isProcessingScan) return;
       isProcessingScan = true;
       playSuccessBeep();
-      showToast(`Memvalidasi barcode: ${code}...`, 'info');
+      if (navigator.vibrate) {
+        try { navigator.vibrate(60); } catch(e) {}
+      }
+      showToast(`⚡ Memvalidasi barcode: ${code}...`, 'info');
 
       callGasApi('kadiv_scan_approve', {
         barcode: code,
         validatorName: 'Kadiv (Scan Barcode PWA)',
         validatorId: 'STF-KADIV'
       }, function(res) {
-        setTimeout(() => { isProcessingScan = false; }, 2000);
+        setTimeout(() => { isProcessingScan = false; }, 1500);
         if (res && res.success) {
           playSuccessBeep();
           showToast(`✅ ${res.message}`, 'success');
-          bootstrap.Modal.getInstance(document.getElementById('modal-scanner')).hide();
+          const modalEl = document.getElementById('modal-scanner');
+          if (modalEl) {
+            const inst = bootstrap.Modal.getInstance(modalEl);
+            if (inst) inst.hide();
+          }
           stopScannerCamera();
           fetchKadivData(true);
         } else {
@@ -1464,19 +1561,33 @@
 
     function playSuccessBeep() {
       try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtxClass) return;
+        const audioCtx = new AudioCtxClass();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
+
+        // 🔊 Suara BEEP scanner barcode supermarket / POS kasir standar (High-Pitch Crisp Single Beep)
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-        osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15); // A6
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(2400, audioCtx.currentTime);
+
+        // Amplop pulsa suara renyah tanpa pitch-bending (attack 2ms, sustain 65ms, decay cut-off 80ms)
+        gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 0.002);
+        gain.gain.setValueAtTime(0.35, audioCtx.currentTime + 0.065);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.080);
+
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-      } catch(e) {}
+
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.085);
+      } catch(e) {
+        console.warn('Audio Beep error:', e);
+      }
     }
 
     function updateClock() {

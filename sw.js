@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kadiv-absen-pwa-v1.0';
+const CACHE_NAME = 'kadiv-absen-pwa-v1.2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -36,7 +36,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Untuk panggilan API ke Google Apps Script, selalu gunakan Network-First
+  // 1. Panggilan API GAS: Network Only / Network First
   if (event.request.url.includes('script.google.com') || event.request.url.includes('api=')) {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -48,14 +48,32 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Untuk static assets, gunakan Cache First dengan fallback ke Network
+  // 2. Navigasi Dokumen HTML: Network-First (agar selalu dapat versi terbaru, fallback ke Cache saat offline)
+  if (event.request.mode === 'navigate' || event.request.destination === 'document' || event.request.url.endsWith('index.html') || event.request.url.endsWith('/')) {
+    event.respondWith(
+      fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch(() => {
+        return caches.match(event.request).then((cached) => cached || caches.match('./index.html'));
+      })
+    );
+    return;
+  }
+
+  // 3. Static assets & libraries: Cache-First dengan background revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
       return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
