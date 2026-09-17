@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kadiv-absen-pwa-v1.3';
+const CACHE_NAME = 'kadiv-kesantrian-pwa-v2.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -13,12 +13,12 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE).catch(err => console.log('PWA cache add error:', err));
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -31,13 +31,12 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // 1. Panggilan API GAS: Network Only / Network First
+  // 1. API Calls ke GAS: Network Only / Network First
   if (event.request.url.includes('script.google.com') || event.request.url.includes('api=')) {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -49,7 +48,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigasi Dokumen HTML: Network-First (agar selalu dapat versi terbaru, fallback ke Cache saat offline)
+  // 2. HTML Document Navigation: Network-First (agar browser selalu memuat tampilan terbaru dari GitHub Pages)
   if (event.request.mode === 'navigate' || event.request.destination === 'document' || event.request.url.endsWith('index.html') || event.request.url.endsWith('/')) {
     event.respondWith(
       fetch(event.request).then((networkResponse) => {
@@ -60,19 +59,15 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => {
-        return caches.match(event.request).then((cached) => cached || caches.match('./index.html'));
-      })
+      }).catch(() => caches.match(event.request))
     );
     return;
   }
 
-  // 3. Static assets & libraries: Cache-First dengan background revalidate
+  // 3. Static assets: Cache First dengan fallback ke Network
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+      if (cachedResponse) return cachedResponse;
       return fetch(event.request).then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
