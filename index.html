@@ -477,6 +477,9 @@
             <button type="button" class="btn btn-sm btn-outline-light rounded-circle p-1.5" id="btn-scanner-flash" onclick="toggleScannerFlashlight()" title="Nyalakan Lampu Flash">
               <i class="bi bi-lightning-charge-fill"></i>
             </button>
+            <button type="button" class="btn btn-sm btn-outline-warning rounded-circle p-1.5" id="btn-test-sound" onclick="testSyukronSound(true)" title="Tes Suara Syukron (Terima Kasih)">
+              <i class="bi bi-volume-up-fill text-warning"></i>
+            </button>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="stopScannerCamera()"></button>
           </div>
         </div>
@@ -507,6 +510,20 @@
             <div class="text-white-50 mt-1.5 d-flex justify-content-between align-items-center" style="font-size: 11px;">
               <span><i class="bi bi-check2-circle text-success me-1"></i>Scanner terus aktif tanpa menutup</span>
               <span class="text-warning">Kamera: <strong id="scanner-camera-label">Belakang</strong></span>
+            </div>
+            <!-- Pengaturan Suara Notifikasi Scan Arab Syukron -->
+            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-secondary border-opacity-25" style="font-size: 11px;">
+              <span class="text-white-50"><i class="bi bi-volume-up text-warning me-1"></i>Suara Hadir:</span>
+              <div class="d-flex align-items-center gap-1">
+                <select id="select-sound-mode" class="form-select form-select-sm bg-dark text-white border-secondary py-0 px-1.5" style="font-size: 11px; width: auto; height: 26px;" onchange="changeSoundMode(this.value)">
+                  <option value="syukron" selected>🔊 Arab: Syukron (شُكْرًا)</option>
+                  <option value="beep">🔔 Nada Beep</option>
+                  <option value="none">🔇 Hening (Mute)</option>
+                </select>
+                <button type="button" class="btn btn-warning btn-sm py-0 px-2 fw-bold text-dark" style="font-size: 11px; height: 26px;" onclick="testSyukronSound(true)" title="Uji dengar suara">
+                  <i class="bi bi-play-fill me-0.5"></i>Tes
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1284,7 +1301,7 @@
         finalStatus: 'Hadir'
       }, function(res) {
         if (res && res.success) {
-          playSuccessBeep();
+          playSyukronVoice();
           showToast(`✅ Absensi ${name} berhasil disetujui!`, 'success');
           fetchKadivData(true);
         } else {
@@ -1311,7 +1328,7 @@
         validatorId: 'STF-KADIV'
       }, function(res) {
         if (res && res.success) {
-          playSuccessBeep();
+          playSyukronVoice();
           showToast(`✅ Seluruh ${ids.length} pengajuan disetujui!`, 'success');
           fetchKadivData(true);
         } else {
@@ -1433,6 +1450,10 @@
         manualInput.value = '';
         setTimeout(() => manualInput.focus(), 400);
       }
+
+      // Preload & aktifkan audio konteks agar tidak terblokir autoplay
+      initSyukronAudio();
+      syncSoundModeUI();
 
       // Deteksi daftar kamera hardware di perangkat
       if (typeof Html5Qrcode !== 'undefined' && Html5Qrcode.getCameras) {
@@ -1652,7 +1673,7 @@
         }
 
         if (res && res.success) {
-          playSuccessBeep();
+          playSyukronVoice();
           showToast(`✅ ${res.message}`, 'success');
 
           // Tampilkan status sukses di dalam modal (Continuous Scan tanpa menutup modal!)
@@ -1727,6 +1748,117 @@
 
       document.getElementById('pane-' + tabId).classList.remove('d-none');
       document.getElementById('tab-btn-' + tabId).classList.add('active');
+    }
+
+    // ========================================================
+    // 🔊 AUDIO NOTIFIKASI SYUKRON (شُكْرًا) & SOUND ENGINE
+    // ========================================================
+    const SYUKRON_AUDIO_B64 = "data:audio/mp3;base64,//OExAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OExAAnwyYAAHpGvQAwSUBLAhjHbIckFQTYqr3bxrVfgRmgoy2QMIEGeEIWkT7aNtdG2jFAoJFBQSBQkzPC9ggJII5risnqKNukEdh/6dw5hBFc9K5oTwDNK7mEEddw4GL3I0SAAAIEAYG4G7u7gAAAAAgjRDK+4t9BHERABITi3d3PiInELcDFyu5micCCPDi//MMD/H4CJxHh//hhP54j58w9IAAAAQH9DwCwAWg/00dVHjUyqhTtyEQVezHR//OExBQlap4wAHsQuDFi7kF2Ux5ErYhjYWLGUbQkCQek/HJceEAUjsHg5ny3xLVxnBIPLn9KMOVjYdYw+BKJ1DsXYynuL5EARBQucUqhDCNykpzxAqxdKGl7JUCnCbpJiTkDuXSpii2ShhBiVo/6Qp/qj1lgwZ2iBwwi4TRcPlVsY962tk1h9n3UK3Lq8PoeAFn7zj78CKGPLy4f1hl1CriJJLuHPTUfe5sWp299qArJoj8kZdjRE3NdoZ48Q/0e//OExDEyO5ZoAGPYvK9RyRH8NucGNnkTjpnYDkTppoWfio8NxtGVER3YkGg5gBoJIPB7I4IERaDczCcfyQPZu2aL5O15mUh0hMHSWT2jxtfAT4GT9+By6/rsLKOEtWsLgiRZTV793PK5uYRHYloxLVnaMw2A8clfdfZZV9s87btr/lh/FlV+c2/MsOTlKb0076de9KTMzeZnV/yEu8LHAQcj84cTKFedAQhoi1/8QPTVbb9vj+t6X3/jGGRtUiSW//OExBstgy6QAAvYvTcJ9XOq2vG9IV59MjyA0KOyhYhwOlNBmyymPEcShkl1EMrhHA8eGAjAEH4KEEnoI8B4UjlThgckZEQCwTR8qi9pKS884/qcuq5Ti+UTw46IyUDuT0S8gAMIJHdHRYVz7eiTlxt9IIFx8VnkJfXp7YkMFiVSvK4/t2Y7rJOf55ZE/W3t5Is4u9wYLMngJc24HIkGBeAyPt/9+36wN/8fTDiPwtT///5//9tfP3im7PKLCp3m//OExBguG86gAAvY3JquIFM3vr+mIrxWs6tLecaUbF0qF9ybG9vezxKJpXxlQSwmJlFCbwGA7Qyq6Iapse2T03ebVkyrnE9gDhYUGBdjbRITqRjXHX/iTxsGMCAWybBLR4+DUvljbEEUGl176iMiLTAkhWhrlwUD2VjlsroY9FnhgjiMPejJBwXNJD090HUnsYhli9bUtPb95mm3n9npvO3mazPb2zFet9orS6LqMf+Y/9VSv3/qdlI6pkOQk1jY//OExBIqoyasAAtevIGp1JBR5Bq0jySEzKBdOoj6JsKInA7CwmrlTz+EvqpOMqsShbxvl/fExgCesSAVCQXCGYYk0a0VsVuU4l3Bkn2/Vr6Btmq4MklZfDsxYbnGAz1o4qOqHXU0Zlb2o7oLCwSPZTqeQdOo7jPLO3TOsR3to7rV564vV26jx3+nkbESkTdfCmB0VQwWHggaRUPWHVENMnGl2kymulH/uqpfb4xvGP/n5zj//4/18V7BV8/Yca+L//OExBosmxqsABPevVrXlnxa2o0K7fFqxNa1AYyateFa2rcBdPGFUQz4bblMP86GYxVy2mUf6qP9hX1BO5q6kzjHVTglH2212w7eP2TOY9IEOj6F4W48SeGumrE0ZvfsrKpWtgP5XX0nqs88be6SqZR2YYqdwpVBBjxfCZFahrlFoxwb2izb3qzy88QFMHNgBsWDoW7WwyTaO5/+ueVBP48Qa///dVHfstL0Zefnh+U/7j5mLgboOEwelrFrC29d//OExBopazKoABIevVa8DxkNbALHCoKATFB6H0DZWsieJ0ZUfAmyjZ30p/Tq1OJhmgK5ibnJRPtSqp7AfS4tCs91mtrQasU0bNYNZI8TVbPoc9bbhPpoTk6bYLFNazdZm3Cd7aIKp2zVsrsQcIVAfvMxsbhf28076taZ1X7xaf1hBL4KIBwkpx8bXs48k+X1fKflc3v+9pXSuzmHL+mUEpp11g8wCgsqdWX08eirWx8/Oyu0cfyPOaKiw9YMIkI///OExCcnGyKUAMsQvEQdIqnxkfPUuz1u2aW/JrM7MzWuzB65VMnpiPGHodQsDYs4HgJFgpBaC0dRIqaUPJN1k2irpdlrlViVaVlV25i9ho7rFTYaDubbGB8dDNnM2KqsS1FkhyKxva1PFsSu21/AsecRiJbjqqmMO1AU9SsY9KXZHXWrZr3KGxDxINHuQIWBQ4OTBht3u1QCHhxwYCMvG0wF/CRx5XdHV5QNyKKIvKqisVrMbrMtP+3238f/31////OExD0lI4KIANvQvfFMYt/CqxrzTPFgj4UdQ+L2kgCB0f+8/////Ca3Uz/////99qk19H5rVtLkBzjBBNDsaPFktjaoUGnadXsm0StJ/798/pHwNLlypnQxdHX3+5PGLbAdmcXlLh/01xPY46miwHHajL7UtZ8RAJyIuw1Ox6sRQgguwMSgMh8DwRUwUOSNcPAcROJVol1arrzptq9L+kzeo6SJsm666j6ba0TU3RRVtxMf///+pRqff9f///8L//OExFsm496EAOUQ3cXKdRNGxRg5mPBtIfIOJFRoC5h8BxVIWUVYoKXoPLuaq6mbiq4lLr2TYfC7jh0CCOQRq3jFoGp91CVFVPI5pi21oYflEOWKscL7nUmyHFAeCMajsH4QYWpMIAMco8WiqQQZwLnAMArDKFIixDyBl8jxBcTqXDhrdpSNlX1LWht1tq6nra7GJSJ5JH/9DTTZzTDh0a07Hneqoc5v///6KbnO19lbOOLyKEhFFQPh85AlQmgm//OExHIlw458AOUOvALDQSReWFIkFTCDs8x6e6dH848eOJMaRNOLkmBYaAVhWVdip2slDzBiQBDSumxiABMqdTrIczuyNuADPwhEVvkxVhUVXNS+hMqpn2cZ0jDA7uSHLZGNx1kaRF2mDQS6tBDMZf2HZbjjjjl3/13fMsef+OOP45ZZZZZZdy5+sv/9d4b/9m/5Vf/Wv4YlahuV////////9dv/+f//bXmiqFjiRwdA2cVOJIBcfWUCo1pUVBqb//OExI4oM45cAN4QvLLwzcM3/szSzWzFC1qTR5bif6kw07zsg7GAE/y0V9hcBGKyEYRAxgABpGPm/6/YBgGCpcNJwkTXYMgAhLXaXVJTUTSGa7FVdjsx7ssxXdS22BnHG/tXK0/FzreWj+96u1KKpQGjQZSMi/Yv0cl6Pf5iqi3hpDeWuZ5V01thiJWi0jDvs7kwg7KEue2iPSc9PN6T6VwSuIv2vpLW+rRbmnj7KsrU4OuXMjxo+/fwxdoA24C6//OExKAnAxokAOMGvUwwIZbGn3CwCYkAtYdKGo0/tFOO7EJHzPLdmgv37ySeEaLJAM13qjj0dsp6UQWlJkNllX/kMy+VF7B3ZkIbdXPU07kdmjYjztT21/mI5TtRdP8rzM50plu3b+6/ZKJfZan7Yt/UeXRlVFYxVe2l3L7bh3bZ8eqlbfe1f7j4Z4ef8nMqm/2mnWj12l42HfHSNG4kvSU1qWvkPcSVwmmgKhhhZSYGOg4Hay0CCzQy8ygEfObL//OExLcm+9IcAVswAX6wJlwkoW6FxyHZjjAydU/fR6+mch+YhEo/OQO+ydo9+aYMzM3aGMT8rdyvF51Xa1Gir+uTVS98xT1KCVTVV54CfBnEpiV+lrc7ZvS2LS2it0+b7Tk3KKSUxXOvh25bppRn/btypKL89XZfKr8Rrx1p9yCrONW5dsY262P8lVLalHM4nqVw99qONvNxB22sPxdhTwQI4FLh2rYpcd8q56+rczoYGo5ddhiBJzOGJDWznpfE//OExM5HBDYYAZvIAOih51IxLoxKKN9MIFUDlt+V2d5/er3LGGqTC9yxnQdr4X+cxo93qs/N2b9ejvVpXQy6Wc+pUweOXuPDkPQBI4zPw3B/y94XAoZXLqWtCEVGAg09LsGlCNBoRjQAYYx2ENkAgaAW3Ms9DMOVSxHlEH4WMmA6VBKsMBEVGH8lkqWAMAOImPRHlNS+ocbSr0l6dcScQWNDElRLef04Ay3YYK6jOYXGLHM+y534nGrdO2jZ4RWm//OExGU/nDpsAZnIAGr+HP/+bs/3H8ZFj2mw7Wz/uHN0/bH6xyuXsInAmqtyeu3q9aO1LGufzPX4fhR3P1jesZ27P5dw7e5q79vf1v/Cpehyhl9jWGVjfM8qsN4x1u8djFPb7Xwwz1UwlFBJnqlc5GrFStJKGgs/3//feZ/b/n///+ev5ypczwu2+3LGG8efU19jPuNj7tNZsXqO7hjyzlezwq3cJVVrKRLL3HAhyevumlkAQQtsX3MZMTORVLSH//OExBkto7p4AdtoANuVZHhzW0d+PP1XjDg15OQSMdHsZDyNS6ZD4Pg2DCJCAjAgrBDHeNI+j1SRJ5QHKJ2PpobmCi4bGrpm8vutZszmNe9ra0aure7V2SWnskkkpJSSRxJX1//qXQUghdX6LVmS3QNTITw1KZLEsSxsbmJifTKKDmxfM0Sebl8zSRN2NKSLadDV/+zOt3qRdzM3UgcQczMFKDAktMCeKWalRkKoJH3yMbnzgHY10bBABPAoTM0H//OExBUtM7Z0ANsQ3ExMWWFdppLMln0T6Rt9VBgG0aNQ7jPsWpIHDttaP5yPx6dKBCMjBDSOYzCKC4MzYjuRrEkb6mNfRbsKAePLKN/M3m95/bt2cvLjLa+8ImRLD4HLO/xFRXz/37df1G8RIxC2lBw+eJ66aKlIADFhCJjglFUHjnFVFTXoWb7HR4qIt2q53OkNbcQ7TF1DRNSK1qKzj0gYdY2iXB0FfCjHaqUcFjEgWRDgMFok8qKROEIK24oC//OExBMsm65wANsM3AGfBkHbKk4YUHA4gaDmsGvdypAhjMCiklRmQ9j3yRlWtMmnyuUKiUtD4RMMLuKJLz5MTpjo8cOVqYtVqylxSldePvy8/XOr+WttcW9bc2ZiTiR6j8OUc+ZSzUSjYY4sjL/tv+/98nGvN1mzlzJRz2tkauGuVwEN0M328S3n+PrNXZs8/znavvzH18b3+/7Q/ja3dyY0yFngVZA9OkXbRQoZA0NNEFRKaRpZpoYl4FYxgHGG//OExBMq06J4AOZKvc+GLwgGAJm7qGMw2GCWSMQM204wmXPEioECCR1E+5eBctJ124vLLecxAlyJwG47TmrQMnxALn0UIlkYgOM3HYxpo3L7UQl8av9t1JdTy+GIhW5rDX7ztrt/9XECOIEMpGUeh/0////2R1ZkFhYsYw0e4gcGDAQxXZjVMm6Ihi//Tf//uRmRYico8YLiKdGywmNWRvaDY4i2qolEX2RQPmMkyaRMgxJUMcA4pEwqGmTjiB0E//OExBolIqqAAN5KuIXDzMSU8UExlmFUYINhixDSEDy0ccZnO19ROOSGKWnU0u9ENUSRMkiUoi8OyCITMxQ5xaAbOUroLeWFW54wCB8ASMJbOyUVdf78i3sPfR2Zf/////+ZyOUpikDrC5Q84fMNKUN1Ps9v1S8IkiwBSWe48ZHsLpWXFkuQiq9Rl5iVEcEXpiLvBhIAguG5HHQEOQ3YEQEHKCw7O1DzlxAWrirnMM0MBkKthbRCp5n0bSBre2NI//OExDgkorJ8AN5KuPryStDISVZUoekOzF3YhGIvKcNyOVdlktpqCtFZVjX1S4iZhECig0GdHu21rWpTpVKsT////////5UfoxhUynFik+MWNFf/MdDxHMpEMMNedAzgZrGCUXLnmpq7LWwCDgEnxobRAYmIpRh/wSFiwDcesOCkuYUnIYwHCRNGVyAKCJWTgEz5BXcNUVJnE1HnlmFDAYNFFljdCIsH27zbfTwG/1NbiEds0EQr40kxUyp697de//OExFgnPAJ8AN4E3b8rWJZaw1+Xd95v//+7/+fzjOKc7Z6bt/////9v+6nuhmEoYrATuZurwfV///+zWpzESYmuZTpdlaV0tzahGzgsiJ34MYZn01DSbYfMSIDEQCa2YqCQMp8iMIzJQaChBiyxnQh4nk3z6jJMIemS60Kh24kzIsZphst1FCJ0un0dC2rmxdnCupFMO5D2e38nfnKeW0EQq4/XprVJRZd+eu8pKGW71t6prqbm5WU5Bhhror9///OExG4na3Z0AN4KvP///6J/Z5yGzGNBCHEzEqx161KzWUn/+q0eZHpoZUFkAZIKnSTGWQ2lwjOwModoQlbV5AQUml9+bCAph0EIJTPSaAwNUCDggBkAupn4IA6m8UYdLGdSeIwuYlURDiyO9lWl2NzDKODKnzu0YUDKL7cXzl1yDJN3bxyHO607D4Mj+VNBD3ZYSccJi4gXUop1VvntrSa/Z6KhKFGPHdUqc///////uh10OQjC6ArgTguCDFxg//OExIMnMrZoAOYUuDeIskCQPirP/Gj63//cbYwOPBgIA+JAMZYucNTQwSBzhl/M4g1PElGgjUYOCD8GAxcYaAL8Q8FAEpLmEPZYx8sNbFUqcUv/jT7Dc4qZoA2C1Pk4X2NHYmXDYrdxbGTFUiEI5uof6qYk4pXsTT59EiM1vjNNb///x97+9/+acoAAOh4me5iUNb/////+665QUCwajIlBCD0GA6AOEVjrIfXT///uhpyn////TZ6WRzzFUoEG//OExJkm2+ZkAOPO3GihVaoXAEcCQw3jwwhB4viYIhCahhMLAuysAg8TBhC4DHgnqXY5jn1mMWx+BE6alxbG5c4bFThdgjZNZDQVtqot7rTulmxCct6XmhQzKjw3JlkY3ePllpe+sZtr1xq+tZ+PvH11rp6Q7yKpC9a2V//////70bKMjEmjhE9NxuGHDcHEZjEdRki73769f/7dLVb//9rV/Uk7onTN5It7cdraeFTIqgM0b9wUIW4GBV2aHFDE//OExLAna+ZgAOva3dgZCVxoG0AyBWUUfIMxRrMpygoU4105ZvA3fLN4SRQ6MiSnpLFZqStTlhkQ6IuEbAwxq6dvbVTVD24mIzBWIR+znt+jbU1pPMepzhfCQeaeiIz//////+lHRFICU0WyIfhdiwBVBUCyFoAlmJ6P2QZFGf9HOCjBpwHgMha1VUGRQAgoG5k9RxhaB6+ACrZEQyMI4AIXEJ5awqGLEdTS6cbb8SKjYC1zCL409qrnThvCMCuV//OExMUj+rZgAOPUuOzg2Cm0aaFQrHjFqiH21JPFbiwHVdPFhjJhAsWHJxev2F18Yrfe7+mdz51nH3vedtdjdZ0OElzE+fRP1KVqqZX/1bt//roLWu5iWj2KzoSQL8JqEnBUjlGwcw9jZAxMX6Gp3tbfV07HHTQW3///3Vo3OVIH03QOKDN7znWEhcHzAwuDfCwUEhgiAJi4c4GSsiB1JExyCcSBF/x4KGLzjYI9jTrilGjKRrIxrVe5xYMZxu4h//OExOgsI+pUAOva3aSWZAO4LVsXJ43hTxIEJomgnNCgndEVCuFhQCoS7Y8Y1S4acdxX81df/GL2+fnWY/1jG3PJKcyMCdJE0WRc2RSWZNW7Ltq/91L+r9TOtSSKCDmBNlMokEFADNhhUEYLNCEETFDmJsTqzylJortZmeuiuqjUg500etBFqtTf/9WyC1IIukmkam5ucN0z6ShW9CpOMSASMD8C40wyHjC/AuGQIRUQIwYQIFWgoBoMAhT5Q8CA//OExOoxy/ZMAOvg3S5X1iB4anGkuDOg3ABKDA664Wlrittl9WOqc/VDmP4kjqqg9pLNjpYcrjwujEGwlAdHIsmJNQzk9+5eLcTWe7azL/V9nq7VdME1zXSNV1oMZHE1qMbpskqzorp261o1KTM2UyNtkG10KjZE8XSfZInxjQ20SImBCELmBA4a8G1gLoXmTRPmLLqUtTvLSWmiuupFbIrLtjU6iyKKK6m//VdVaPRRRPGRSSc3JLJl310wGFMx//OExNU0K+ZAAPMg3VRSMHnbOQA5MjBZHBJAw6gkAiIBxEBKSCPzDlAreL3ZtMfFLRej1LCLIEiOxDb6QLWsUtrb6NUhxTRAtI5FVokMySLRGVZVqeipJzOUupafqzM2KeflFPamY9DdBAT/4Rulxtaxx7vm+dwz/Vr62ssEqkkkVJooG1K6V3rrUl+3qSrRZRsmta63UbuqgnSTOLLpiXhxFIcIsgnwIUBNguYlQzBfiUJZM8ZJqep0UVPVrapD//OExLc04+owAO4a3FJUUWUy0X7N32++ySkUbrSZJa1JJTy44mIVHLaVMgISIGMMVzkk0sDAOF1+NOvUESlWGx1HRKIepkAei2GQAwiGhwmKahxKZcxGdZqznESkfABUN4YRll2XMXHYafWHytTrp9v6rrXxXVoL2idbrMVh4Cc5r7kk1liLgw9bD0aDgtIC4ETIilYph8JwVZATUAyRByFTr5qVU8QqFny126tut2TZrHHxooLqDIqLqg5gyLTy//OExJYkCTYsANvecKyhhiUDspZbGY1WtzM723DMYPknJyHKZgBEB+E2IUxK5iVUGC8s/jVXW1wolyZLEuHNx9YUDeKzws51XMbeNR60EWdhsYIEKI8k0BkSw2Y2rTLONlHIz9NfMSdiu6iYF5NqxDyoGPZ4px9jpGy0an8bImNIZeGiaNjvlI3PT+0dzhv6Ic1UxP1S11vrBXYwSpiWz34fuimyXTMJhqvGavM8cq/z1WUYS6U7kJIUWRCQzYvS//OExLgmouIQAMvGucSmwMf6pYhPr15o8mpOS6i7o8/FQWVCoopyaaR0R+XdbuY7277NPHy+5mPvbf9zF7Usp5Y0PdSWXSvDlqhIqd3SB1et29yHaC7g10Ox9Fet/+3KW2y4h+2zE+6b/xcJ+Y13/0ufj03jvVNrPlt2SLU6pF632OjRySbBvOsKnHSNTi5drc4jLKKQ5qB83K6hpGIidKxwW1MymigyyfEdmgpDu/uROkhShbaBt5tHJARmFyJm//OExNAmQ8IAAMmM3co0sS5iTNEDddUukQQpxiovKL1J6M7O1qKSpKdGUuuSXQr1C3UCLLY7Vw5Ob0lhpdyigOSoxJIp43s/0UnHktz7f7uISa5q8YPhzYWk6zUC9KPOnb8QUg2fxMWU5Zm3lrcngtsuJKcqp11vj80pN6Q7MRfWlVwgjSc5/54V6+OWrPKarTy+DbPa9NmvlrnJiIy8ujUVakqSokFC8pEZCQEbcWp6a1MdKuaehCbi1sCQkioi//OExOorrCH4AKJM3U3IUdG5ql1bn7gOdBBqbyJQzAyuUZ7OQQFkjkLd9MxlMnpwG+m1pXPNvdWT5T9dUm0uIyqgoqrimxZ2YwKTg7XNvKs6HKP5qWHoMszqL+pJlrppZrKw1n03CixzBrb2kUNXnmV2hrO5DCi2OhNDMfNa5LsCZYSF1QqdTNjx9bOYMkdSMVKRqomsDbayOiphc4VHjGNqsLIydBI22UYTbZSIEJPchKoqRNG0cjRleIo83+BI//OExO4slBH4ANJM3UEHTkvKOw1kmlEhXxCjPzhFNKxvZ4lkfzL7l/7Sz/h8AZH9/co4ZjIOKOPhi0y0b6k0mgiz3aHS+XdEloymvWqUcRmbIPqHMNqZpWyWUhkytKeaicadjMkZtgVLP2Gh9aVrLv5kbu3cc1/22LO943nsxSoGTjqB9qkmQNy5STQLBPnUnWUS5RDZyMCVFGEHwQLNKAKqyZkqIwTVTTZdrBESoJrICZaka4pqCM+34wIV+SCl//OExO4rTDn4AKJM3B+VxbkeQssSLqoAljx4MpY4l7JQmFQkNMOId5Q2vzr5KbSTPNrCsMht27igI5KxxeHKx1rBDTHKNy9OnCT52YkzFVh2yqdkMYrfSj1zjXu4W6k3gDyZ8w1rajsYvDFGO8nR5rVVb+nrIzTGqHbeY/J6NykZASJV03rruo78MRySwFnGr09Yj8vpLeKFpxoU/SElkkKhUHzbiFRVEKUSADJEiD4sXFpnGYpExVgQoC68LpWC//OExPMsJCn4AKJM3STIXsovNzUJtLNNIfk2YxwhdeVRsOcBoUSAyRakiLabN4kiSLhIFqnBVPFUzmqSxaJIpaNYkocCtUvLa12ik+bCUnJwmrc5qU+NkjILRI06yMa3Nja9hPquStsoF5yUnLnK2aqqI5OEqtHsWj5oi0+EtnNglWz9IyyXljbwqzBAEAaVi12aPPDEGQ3Bz9QzEo7BUEwbDEjkJ8cnRVLxSM1Cp1ctOiqXTg/RKj0lByKhMJZg//OExPUvNDHwAMpM3b1j8T1ZmrW0/prn1tvWrtq2rmwQwsPuvVaZTITbkfWqcaWZcblGnFXDxuVLs7XmzTOztuV/5p2dneNmpONAgI9Dc2TjSzLzZo0UUfFxs0aWzteVLN2lnZ2a8qamjS4vKmjSirjc2TjS4uNyjTmdna83/5Us7FvG5s1JUMTVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OExOstDBWoAMMM3VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
+    let audioSyukronInstance = null;
+
+    function initSyukronAudio() {
+      try {
+        if (!audioSyukronInstance) {
+          audioSyukronInstance = new Audio();
+          // Coba prioritaskan file lokal, fallback ke embedded base64
+          audioSyukronInstance.src = './syukron.mp3';
+          audioSyukronInstance.volume = 1.0;
+          audioSyukronInstance.preload = 'auto';
+          audioSyukronInstance.load();
+        }
+      } catch(e) {}
+    }
+
+    function syncSoundModeUI() {
+      const mode = localStorage.getItem('maisya_scan_sound_mode') || 'syukron';
+      const sel = document.getElementById('select-sound-mode');
+      if (sel) sel.value = mode;
+    }
+
+    function changeSoundMode(mode) {
+      localStorage.setItem('maisya_scan_sound_mode', mode);
+      if (mode === 'syukron') {
+        showToast('🔊 Notifikasi: Bahasa Arab "Syukron" (شُكْرًا)', 'info');
+        testSyukronSound(false);
+      } else if (mode === 'beep') {
+        showToast('🔔 Notifikasi: Nada Beep Standar', 'info');
+        playSuccessBeep();
+      } else {
+        showToast('🔇 Notifikasi: Hening (Mute)', 'info');
+      }
+    }
+
+    function testSyukronSound(isUserClick) {
+      const mode = localStorage.getItem('maisya_scan_sound_mode') || 'syukron';
+      if (mode === 'none' && !isUserClick) return;
+      if (mode === 'beep') {
+        playSuccessBeep();
+        if (isUserClick) showToast('🔔 Nada beep berhasil berbunyi', 'info');
+        return;
+      }
+      playSyukronVoice(function(ok) {
+        if (isUserClick) {
+          showToast('🔊 Suara: Syukron (شُكْرًا) berhasil diputar!', 'success');
+        }
+      });
+    }
+
+    function playSyukronVoice(callback) {
+      const mode = localStorage.getItem('maisya_scan_sound_mode') || 'syukron';
+      if (mode === 'none') {
+        if (callback) callback(true);
+        return;
+      }
+      if (mode === 'beep') {
+        playSuccessBeep();
+        if (callback) callback(true);
+        return;
+      }
+
+      // Prioritas 1: Audio HTML5 menggunakan base64 instan (latensi 0ms & 100% offline)
+      try {
+        const snd = new Audio(SYUKRON_AUDIO_B64);
+        snd.volume = 1.0;
+        const p = snd.play();
+        if (p !== undefined) {
+          p.then(() => {
+            if (callback) callback(true);
+          }).catch(err => {
+            console.warn('Audio play autoplay blocked, falling back to SpeechSynthesis:', err);
+            fallbackSpeakSyukron(callback);
+          });
+        } else {
+          if (callback) callback(true);
+        }
+      } catch (err) {
+        console.warn('Audio error, falling back to SpeechSynthesis:', err);
+        fallbackSpeakSyukron(callback);
+      }
+    }
+
+    function fallbackSpeakSyukron(callback) {
+      // Prioritas 2: Web Speech API mengucapkan "شُكْرًا" (Syukron)
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utt = new SpeechSynthesisUtterance('شُكْرًا');
+          utt.lang = 'ar-SA';
+          utt.rate = 0.9;
+          utt.pitch = 1.0;
+          utt.onend = function() {
+            if (callback) callback(true);
+          };
+          utt.onerror = function() {
+            playSuccessBeep();
+            if (callback) callback(false);
+          };
+          window.speechSynthesis.speak(utt);
+          return;
+        }
+      } catch(e) {}
+      // Prioritas 3 (Fallback terakhir): Oscillator Beep
+      playSuccessBeep();
+      if (callback) callback(false);
     }
 
     function playSuccessBeep() {

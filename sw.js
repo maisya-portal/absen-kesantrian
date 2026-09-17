@@ -1,10 +1,11 @@
-const CACHE_NAME = 'kadiv-absen-pwa-v1.2';
+const CACHE_NAME = 'kadiv-absen-pwa-v1.3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './icon-192x192.png',
   './icon-512x512.png',
+  './syukron.mp3',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
