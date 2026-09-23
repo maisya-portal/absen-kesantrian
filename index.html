@@ -216,8 +216,9 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      max-width: 90vw;
-    }
+    @keyframes spinSync { 100% { transform: rotate(360deg); } }
+    .spin-animation { display: inline-block; animation: spinSync 0.8s linear infinite; }
+    .cursor-pointer { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -299,7 +300,8 @@
             <div class="fw-bold text-dark lh-sm" style="font-size: 15px;">Persetujuan Kadiv</div>
             <div class="d-flex align-items-center gap-1 small text-muted">
               <span class="pulse-dot"></span>
-              <span id="sync-status">Sinkronisasi Otomatis</span>
+              <span id="sync-status" class="cursor-pointer" onclick="fetchKadivData(false)" title="Klik untuk sinkronisasi sekarang">Sinkronisasi Otomatis</span>
+              <i id="sync-refresh-btn" class="bi bi-arrow-clockwise cursor-pointer text-success ms-1" onclick="fetchKadivData(false)" title="Segarkan Data Sekarang"></i>
             </div>
           </div>
         </div>
@@ -762,7 +764,7 @@
     // ========================================================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=3.1').then((reg) => {
+        navigator.serviceWorker.register('sw.js?v=3.2').then((reg) => {
           console.log('PWA Service Worker registered:', reg);
         }).catch(err => console.log('SW registration error:', err));
       });
@@ -897,13 +899,13 @@
       // Lakukan pembaruan data segar di latar belakang
       fetchKadivData(false);
 
-      // Sinkronisasi otomatis setiap 12 detik dengan perlindungan anti-stuck
+      // Sinkronisasi otomatis setiap 18 detik dengan perlindungan anti-stuck
       if (!syncInterval) {
         syncInterval = setInterval(() => {
           if (!document.hidden) {
             fetchKadivData(true);
           }
-        }, 12000);
+        }, 18000);
       }
 
       // Auto refresh saat pengguna membuka kembali PWA dari background / minimize
@@ -940,13 +942,13 @@
         }
       };
 
-      // Timeout 9 detik agar request tidak macet selamanya jika jaringan tidak stabil
+      // Timeout 25 detik agar request tidak macet namun cukup waktu bagi server cold-start
       const timeoutId = setTimeout(function() {
         if (!isFinished) {
           cleanup();
           if (callback) callback({ success: false, message: 'Waktu koneksi habis (Timeout)' });
         }
-      }, 9000);
+      }, 25000);
 
       window[cbName] = function(res) {
         cleanup();
@@ -968,10 +970,16 @@
       isFetchingKadivData = true;
 
       const syncStatus = document.getElementById('sync-status');
-      if (!isSilent && syncStatus) syncStatus.textContent = "Menghubungkan...";
+      const syncBtn = document.getElementById('sync-refresh-btn');
+      if (!isSilent) {
+        if (syncStatus) syncStatus.textContent = "Menghubungkan...";
+        if (syncBtn) syncBtn.classList.add('spin-animation');
+      }
 
       callGasApi('kadiv_dashboard', { targetDate: filterDateHistory }, function(res) {
         isFetchingKadivData = false;
+        if (syncBtn) syncBtn.classList.remove('spin-animation');
+
         if (res && res.success && (res.pending !== undefined || res.active !== undefined)) {
           kadivData = res;
           try {
@@ -980,7 +988,11 @@
           if (syncStatus) syncStatus.textContent = "Sinkronisasi Otomatis";
           renderAllData();
         } else {
-          if (syncStatus) syncStatus.textContent = "Koneksi Tertunda (Mencoba lagi...)";
+          if (syncStatus) syncStatus.textContent = "Koneksi Tertunda (Klik untuk Coba)";
+          // Render data yang ada dari cache jika tersedia agar layar tidak kosong
+          if (kadivData && (kadivData.pending || kadivData.active)) {
+            renderAllData();
+          }
         }
       });
     }

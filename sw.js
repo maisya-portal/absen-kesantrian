@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kadiv-kesantrian-pwa-v2.2';
+const CACHE_NAME = 'kadiv-kesantrian-pwa-v3.2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
