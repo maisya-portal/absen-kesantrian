@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kadiv-kesantrian-pwa-v3.2';
+const CACHE_NAME = 'kadiv-kesantrian-pwa-v3.3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -36,15 +36,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // 1. API Calls ke GAS: Network Only / Network First
-  if (event.request.url.includes('script.google.com') || event.request.url.includes('api=')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({ success: false, message: 'Koneksi offline' }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      })
-    );
+  // 1. API Calls ke GAS & Firebase: Langsung lewat Network tanpa intervensi SW
+  // PENTING: Jangan gunakan event.respondWith() untuk request ini agar tidak merusak 302 redirect & script tag JSONP
+  if (event.request.url.includes('script.google.com') || 
+      event.request.url.includes('firebasedatabase.app') || 
+      event.request.url.includes('api=')) {
     return;
   }
 

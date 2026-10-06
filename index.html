@@ -739,9 +739,11 @@
 
   <script>
     // ========================================================
-    // ⚙️ KONFIGURASI BACKEND API GOOGLE APPS SCRIPT
+    // ⚙️ KONFIGURASI BACKEND API & FIREBASE REALTIME DATABASE
     // ========================================================
     const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwELxlXYsX7G_o4A25hi_5bd7dsEO3wIdFJXxmIWV4393O7CiRXyA19tDEFTuYrtmQb/exec";
+    const FIREBASE_DB_URL = "https://maisya-portal-default-rtdb.asia-southeast1.firebasedatabase.app";
+    const FIREBASE_SECRET = "49KOpTLqTrAnLqGfaP6OBmEQf68sbXK6t1PBoaNU";
     const SECRET_PIN = "010387";
 
     let currentPin = "";
@@ -764,7 +766,7 @@
     // ========================================================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=3.2').then((reg) => {
+        navigator.serviceWorker.register('sw.js?v=3.3').then((reg) => {
           console.log('PWA Service Worker registered:', reg);
         }).catch(err => console.log('SW registration error:', err));
       });
@@ -872,7 +874,7 @@
     let isFetchingKadivData = false;
 
     // ========================================================
-    // 🚀 INTI APLIKASI & API ENGINE (JSONP / FETCH FALLBACK)
+    // 🚀 INTI APLIKASI & DUAL-ENGINE API (FIREBASE RTDB ⚡ + GAS FALLBACK)
     // ========================================================
     function startApp() {
       updateClock();
@@ -899,13 +901,13 @@
       // Lakukan pembaruan data segar di latar belakang
       fetchKadivData(false);
 
-      // Sinkronisasi otomatis setiap 18 detik dengan perlindungan anti-stuck
+      // Sinkronisasi otomatis setiap 8 detik (ringan & super cepat dengan Firebase RTDB)
       if (!syncInterval) {
         syncInterval = setInterval(() => {
           if (!document.hidden) {
             fetchKadivData(true);
           }
-        }, 18000);
+        }, 8000);
       }
 
       // Auto refresh saat pengguna membuka kembali PWA dari background / minimize
@@ -914,6 +916,108 @@
           fetchKadivData(true);
         }
       });
+    }
+
+    function getJakartaTodayStr() {
+      const d = new Date();
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+      const jkt = new Date(utc + (3600000 * 7)); // UTC + 7 WIB
+      const yyyy = jkt.getFullYear();
+      const mm = String(jkt.getMonth() + 1).padStart(2, '0');
+      const dd = String(jkt.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    // ⚡ PEMANGGIL CEPAT FIREBASE REALTIME DATABASE (~80ms)
+    async function fetchKadivDataFromFirebase() {
+      const today = getJakartaTodayStr();
+      const filterDate = filterDateHistory || today;
+
+      // Ambil Tbl_AbsensiStaff, Tbl_ShiftStaff, dan tb_settings secara paralel
+      const fetchAbsenPromise = fetch(`${FIREBASE_DB_URL}/tables/Tbl_AbsensiStaff.json?auth=${FIREBASE_SECRET}`).then(r => r.json());
+      const fetchShiftPromise = fetch(`${FIREBASE_DB_URL}/tables/Tbl_ShiftStaff.json?auth=${FIREBASE_SECRET}`).then(r => r.json()).catch(() => null);
+      const fetchSettingPromise = fetch(`${FIREBASE_DB_URL}/tables/tb_settings.json?auth=${FIREBASE_SECRET}`).then(r => r.json()).catch(() => null);
+
+      const [rawAbsen, rawShifts, rawSettings] = await Promise.all([fetchAbsenPromise, fetchShiftPromise, fetchSettingPromise]);
+
+      if (!rawAbsen || typeof rawAbsen !== 'object') {
+        throw new Error('Data absensi kosong di Firebase');
+      }
+
+      const pending = [];
+      const active = [];
+      const history = [];
+
+      const keys = Object.keys(rawAbsen);
+      // Urutkan ID terbaru paling atas
+      keys.sort().reverse();
+
+      for (const k of keys) {
+        const item = rawAbsen[k];
+        if (!item || typeof item !== 'object') continue;
+        const id = item.ID_AbsenStaff || k;
+        const tgl = (item.Tanggal || '').trim();
+        const statusVal = (item.Status_Validasi || '').trim();
+        const jamKeluar = (item.Jam_Keluar || '').trim();
+        const status = (item.Status || 'Hadir').trim();
+
+        const obj = Object.assign({}, item);
+        obj.ID_AbsenStaff = id;
+
+        const isPending = (statusVal === 'Menunggu' || statusVal === '');
+        const isActive = (tgl === today && statusVal === 'Disetujui' && (!jamKeluar || jamKeluar === '-') && (status === 'Hadir' || !status));
+        const isHistory = (tgl === filterDate);
+
+        if (isPending) pending.push(obj);
+        if (isActive) active.push(obj);
+        if (isHistory) history.push(obj);
+      }
+
+      // Parsing shifts
+      const allShifts = [];
+      if (rawShifts && typeof rawShifts === 'object') {
+        for (const sk in rawShifts) {
+          const s = rawShifts[sk];
+          if (!s) continue;
+          let masuk = s.Jam_Masuk || '';
+          let pulang = s.Jam_Pulang || '';
+          if (masuk.includes(' ')) masuk = masuk.split(' ')[1].substring(0, 5);
+          if (pulang.includes(' ')) pulang = pulang.split(' ')[1].substring(0, 5);
+          allShifts.push({
+            id: s.ID_Shift || sk,
+            nama: s.Nama_Shift || '',
+            masuk: masuk,
+            pulang: pulang,
+            telat: parseInt(s.Toleransi_Telat_Menit || '10', 10)
+          });
+        }
+      }
+
+      // Parsing scheduleConfig
+      let scheduleConfig = (kadivData && kadivData.scheduleConfig) ? kadivData.scheduleConfig : {
+        mode: "all_auto",
+        autoShifts: ["Pagi", "Siang-Malam", "Malam ", "PJ Absen Malam"],
+        autoDays: [0, 1, 2, 3, 4, 5, 6],
+        groupId: "-1003813891974"
+      };
+
+      if (rawSettings && rawSettings.AUTO_APPROVE_SCHEDULE_CONFIG && rawSettings.AUTO_APPROVE_SCHEDULE_CONFIG.setting_value) {
+        try {
+          scheduleConfig = JSON.parse(rawSettings.AUTO_APPROVE_SCHEDULE_CONFIG.setting_value);
+        } catch(e) {}
+      }
+
+      return {
+        success: true,
+        today: today,
+        filterDate: filterDate,
+        pending: pending,
+        active: active,
+        history: history,
+        isAutoApprove: (scheduleConfig.mode === 'all_auto'),
+        scheduleConfig: scheduleConfig,
+        allShifts: allShifts.length > 0 ? allShifts : (kadivData.allShifts || [])
+      };
     }
 
     // Pemanggil API GAS dengan perlindungan Timeout & pembersihan script tag
@@ -965,9 +1069,16 @@
       document.body.appendChild(script);
     }
 
-    function fetchKadivData(isSilent) {
+    async function fetchKadivData(isSilent) {
       if (isFetchingKadivData) return; // Lindungi agar request tidak menumpuk
       isFetchingKadivData = true;
+
+      // Proteksi anti-stuck timeout 8 detik
+      const safetyTimer = setTimeout(() => {
+        isFetchingKadivData = false;
+        const syncBtn = document.getElementById('sync-refresh-btn');
+        if (syncBtn) syncBtn.classList.remove('spin-animation');
+      }, 8000);
 
       const syncStatus = document.getElementById('sync-status');
       const syncBtn = document.getElementById('sync-refresh-btn');
@@ -976,7 +1087,29 @@
         if (syncBtn) syncBtn.classList.add('spin-animation');
       }
 
+      // ⚡ JALUR 1: FIREBASE REALTIME DATABASE (Super Cepat ~80ms)
+      try {
+        const fbResult = await fetchKadivDataFromFirebase();
+        clearTimeout(safetyTimer);
+        isFetchingKadivData = false;
+        if (syncBtn) syncBtn.classList.remove('spin-animation');
+
+        if (fbResult && fbResult.success) {
+          kadivData = fbResult;
+          try {
+            localStorage.setItem('kadiv_pwa_cached_data', JSON.stringify(fbResult));
+          } catch(e) {}
+          if (syncStatus) syncStatus.innerHTML = '<span class="text-success fw-semibold"><i class="bi bi-lightning-charge-fill text-warning"></i> Firebase ⚡ Realtime</span>';
+          renderAllData();
+          return;
+        }
+      } catch (errFb) {
+        console.warn('Firebase RTDB fallback ke GAS:', errFb.message);
+      }
+
+      // 🛡️ JALUR 2: GOOGLE APPS SCRIPT FALLBACK
       callGasApi('kadiv_dashboard', { targetDate: filterDateHistory }, function(res) {
+        clearTimeout(safetyTimer);
         isFetchingKadivData = false;
         if (syncBtn) syncBtn.classList.remove('spin-animation');
 
@@ -985,7 +1118,7 @@
           try {
             localStorage.setItem('kadiv_pwa_cached_data', JSON.stringify(res));
           } catch(e) {}
-          if (syncStatus) syncStatus.textContent = "Sinkronisasi Otomatis";
+          if (syncStatus) syncStatus.innerHTML = '<span class="text-success fw-semibold">GAS Terhubung</span>';
           renderAllData();
         } else {
           if (syncStatus) syncStatus.textContent = "Koneksi Tertunda (Klik untuk Coba)";
@@ -1316,10 +1449,36 @@
     }
 
     // ========================================================
-    // ⚡ AKSI PERSETUJUAN & PENOLAKAN
+    // ⚡ AKSI PERSETUJUAN & PENOLAKAN (OPTIMISTIC UI + FIREBASE + GAS)
     // ========================================================
     function approveSingleAbsen(id, name) {
-      showToast(`Menyetujui absensi ${name}...`, 'info');
+      // 1. ⚡ Optimistic UI: langsung hapus dari pending dalam 0ms
+      const approvedItem = (kadivData.pending || []).find(item => item.ID_AbsenStaff === id);
+      kadivData.pending = (kadivData.pending || []).filter(item => item.ID_AbsenStaff !== id);
+      if (approvedItem) {
+        approvedItem.Status_Validasi = 'Disetujui';
+        approvedItem.Divalidasi_Oleh = 'Kadiv (PWA 1-Klik)';
+        if (!kadivData.active) kadivData.active = [];
+        kadivData.active.unshift(approvedItem);
+      }
+      renderAllData();
+      playSyukronVoice();
+      showToast(`✅ Absensi ${name} langsung disetujui!`, 'success');
+
+      // 2. ⚡ Patch langsung ke Firebase Realtime Database (~50ms)
+      try {
+        fetch(`${FIREBASE_DB_URL}/tables/Tbl_AbsensiStaff/${encodeURIComponent(id)}.json?auth=${FIREBASE_SECRET}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'Status_Validasi': 'Disetujui',
+            'Divalidasi_Oleh': 'Kadiv (PWA 1-Klik)',
+            'Status': 'Hadir'
+          })
+        }).catch(e => console.warn('Firebase patch error:', e));
+      } catch(e) {}
+
+      // 3. 🛡️ Panggil GAS di latar belakang untuk sinkronisasi Sheets & Telegram
       callGasApi('kadiv_validate', {
         id: id,
         status: 'Disetujui',
@@ -1327,13 +1486,7 @@
         validatorId: 'STF-KADIV',
         finalStatus: 'Hadir'
       }, function(res) {
-        if (res && res.success) {
-          playSyukronVoice();
-          showToast(`✅ Absensi ${name} berhasil disetujui!`, 'success');
-          fetchKadivData(true);
-        } else {
-          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
-        }
+        fetchKadivData(true);
       });
     }
 
@@ -1346,21 +1499,43 @@
       if (!confirm(`Setujui seluruh ${list.length} pengajuan staf sekaligus?`)) return;
 
       const ids = list.map(item => item.ID_AbsenStaff);
-      showToast(`Memproses ${ids.length} pengajuan...`, 'info');
+      
+      // 1. ⚡ Optimistic UI: langsung bersihkan antrean dalam 0ms
+      const approvedItems = [...list];
+      kadivData.pending = [];
+      approvedItems.forEach(item => {
+        item.Status_Validasi = 'Disetujui';
+        item.Divalidasi_Oleh = 'Kadiv (PWA Bulk)';
+        if (!kadivData.active) kadivData.active = [];
+        kadivData.active.unshift(item);
+      });
+      renderAllData();
+      playSyukronVoice();
+      showToast(`✅ Seluruh ${ids.length} pengajuan langsung disetujui!`, 'success');
 
+      // 2. ⚡ Patch langsung ke Firebase Realtime Database
+      ids.forEach(id => {
+        try {
+          fetch(`${FIREBASE_DB_URL}/tables/Tbl_AbsensiStaff/${encodeURIComponent(id)}.json?auth=${FIREBASE_SECRET}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              'Status_Validasi': 'Disetujui',
+              'Divalidasi_Oleh': 'Kadiv (PWA Bulk)',
+              'Status': 'Hadir'
+            })
+          }).catch(e => console.warn('Firebase bulk patch error:', e));
+        } catch(e) {}
+      });
+
+      // 3. 🛡️ Panggil GAS di latar belakang untuk sinkronisasi Sheets & Telegram
       callGasApi('kadiv_validate_massal', {
         ids: ids,
         status: 'Disetujui',
         validatorName: 'Kadiv (PWA Bulk)',
         validatorId: 'STF-KADIV'
       }, function(res) {
-        if (res && res.success) {
-          playSyukronVoice();
-          showToast(`✅ Seluruh ${ids.length} pengajuan disetujui!`, 'success');
-          fetchKadivData(true);
-        } else {
-          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
-        }
+        fetchKadivData(true);
       });
     }
 
@@ -1404,9 +1579,32 @@
       }
       const note = document.getElementById('ubah-pwa-note').value;
 
-      showToast(`Mengubah status ke: ${newStatus}...`, 'info');
       bootstrap.Modal.getInstance(document.getElementById('modal-ubah-status-pwa')).hide();
 
+      // 1. Optimistic UI update
+      if (kadivData.active) {
+        const act = kadivData.active.find(a => a.ID_AbsenStaff === id);
+        if (act) {
+          act.Status = newStatus;
+          act.Catatan = note;
+          renderAllData();
+        }
+      }
+      showToast(`Mengubah status ke: ${newStatus}...`, 'info');
+
+      // 2. Patch Firebase
+      try {
+        fetch(`${FIREBASE_DB_URL}/tables/Tbl_AbsensiStaff/${encodeURIComponent(id)}.json?auth=${FIREBASE_SECRET}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'Status': newStatus,
+            'Catatan': note
+          })
+        }).catch(e => console.warn('Firebase patch error:', e));
+      } catch(e) {}
+
+      // 3. Panggil GAS
       callGasApi('kadiv_change_status', {
         id: id,
         status: newStatus,
@@ -1428,9 +1626,28 @@
       const status = document.getElementById('reject-status-select').value;
       const note = document.getElementById('reject-note').value;
 
-      showToast('Menyimpan penolakan...', 'info');
       bootstrap.Modal.getInstance(document.getElementById('modal-reject')).hide();
 
+      // 1. Optimistic UI update
+      kadivData.pending = (kadivData.pending || []).filter(item => item.ID_AbsenStaff !== id);
+      renderAllData();
+      showToast(`Absensi ditolak dan ditetapkan sebagai ${status}.`, 'warning');
+
+      // 2. Patch Firebase
+      try {
+        fetch(`${FIREBASE_DB_URL}/tables/Tbl_AbsensiStaff/${encodeURIComponent(id)}.json?auth=${FIREBASE_SECRET}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'Status_Validasi': 'Ditolak',
+            'Status': status,
+            'Catatan': 'Ditolak Kadiv (' + status + '): ' + (note || ''),
+            'Divalidasi_Oleh': 'Kadiv (PWA)'
+          })
+        }).catch(e => console.warn('Firebase patch error:', e));
+      } catch(e) {}
+
+      // 3. Panggil GAS
       callGasApi('kadiv_validate', {
         id: id,
         status: 'Ditolak',
@@ -1439,12 +1656,7 @@
         finalStatus: status,
         rejectionNote: note
       }, function(res) {
-        if (res && res.success) {
-          showToast(`Absensi ditolak dan ditetapkan sebagai ${status}.`, 'success');
-          fetchKadivData(true);
-        } else {
-          showToast(`Gagal: ${res ? res.message : 'Error'}`, 'danger');
-        }
+        fetchKadivData(true);
       });
     }
 
