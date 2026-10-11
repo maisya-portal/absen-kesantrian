@@ -141,6 +141,7 @@
       display: flex;
       gap: 4px;
       border: none;
+      overflow-x: auto;
     }
     .nav-tabs-pill .nav-link {
       flex: 1;
@@ -151,6 +152,7 @@
       font-size: 13px;
       color: var(--text-muted);
       border: none;
+      white-space: nowrap;
       transition: all 0.2s;
     }
     .nav-tabs-pill .nav-link.active {
@@ -352,6 +354,9 @@
       <button class="nav-link" id="tab-btn-history" onclick="switchKadivTab('history')">
         <i class="bi bi-clock-history me-1"></i> Riwayat
       </button>
+      <button class="nav-link" id="tab-btn-tugas" onclick="switchKadivTab('tugas')">
+        <i class="bi bi-journal-check text-warning me-1"></i> Tugas Musyrif (<span id="badge-count-tugas-terkunci">0</span>)
+      </button>
     </div>
 
     <!-- PANE 1: MENUNGGU PERSETUJUAN -->
@@ -455,6 +460,72 @@
               <tr><td colspan="10" class="text-center py-4 text-muted">Memuat data riwayat...</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANE 4: SUPERVISI PROGRES MUSYRIF & BUKA KUNCI TUGAS (KADIV) -->
+    <!-- ========================================== -->
+    <div id="pane-tugas" class="tab-pane-content d-none">
+      <!-- Filter Bar -->
+      <div class="card border-0 shadow-sm rounded-4 mb-3 p-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5">
+          <div>
+            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-shield-check text-warning me-1"></i> Supervisi Progres Musyrif</h6>
+            <small class="text-muted" id="pwa-monitoring-time-info"><i class="bi bi-clock text-primary me-1"></i> Memuat data progres &amp; tugas...</small>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-warning text-dark fw-bold rounded-pill px-3 shadow-xs" onclick="muatDataMonitoringTugasPwa(true)">
+            <i class="bi bi-arrow-clockwise me-1" id="pwa-refresh-tugas-icon"></i> Muat Ulang
+          </button>
+        </div>
+
+        <div class="row g-2 align-items-center">
+          <div class="col-6 col-md-4">
+            <label class="form-label small text-muted mb-1 fw-semibold">Tanggal Tugas</label>
+            <input type="date" class="form-control form-control-sm rounded-3 fw-semibold" id="pwa-monitoring-tanggal" onchange="muatDataMonitoringTugasPwa(true)">
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small text-muted mb-1 fw-semibold">Role Petugas</label>
+            <select class="form-select form-select-sm rounded-3 fw-semibold" id="pwa-monitoring-role" onchange="muatDataMonitoringTugasPwa(true)">
+              <option value="Musyrif" selected>Musyrif</option>
+              <option value="TOTD">TOTD</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 d-flex align-items-end">
+            <div class="w-100 p-2 bg-light rounded-3 d-flex align-items-center justify-content-between border">
+              <span class="small text-muted"><i class="bi bi-lock-fill text-danger me-1"></i>Tugas Terkunci:</span>
+              <span class="badge bg-danger rounded-pill px-2.5 py-1 fw-bold" id="pwa-stat-tugas-terkunci">0 Tugas</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 1: Ringkasan Kartu Progres Musyrif -->
+      <div class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+          <h6 class="fw-bold mb-0 text-dark" style="font-size: 14px;"><i class="bi bi-bar-chart-steps text-primary me-1"></i> Progres Pelaksanaan Tugas</h6>
+          <span class="small text-muted fw-semibold" id="pwa-total-musyrif-count">0 Musyrif Aktif</span>
+        </div>
+        <div class="row g-2.5" id="pwa-progres-musyrif-cards">
+          <div class="col-12 text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div>Memuat data progres musyrif...
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Daftar Tugas Terkunci Karena Lewat Waktu -->
+      <div>
+        <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+          <div>
+            <h6 class="fw-bold mb-0 text-danger" style="font-size: 14px;"><i class="bi bi-exclamation-triangle-fill me-1"></i> Tugas Terkunci Karena Lewat Waktu</h6>
+            <small class="text-muted">Buka kunci tugas secara instan agar musyrif dapat melengkapi laporan tugasnya.</small>
+          </div>
+        </div>
+        <div id="pwa-tugas-terkunci-container">
+          <div class="text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm text-danger me-2"></div>Memeriksa tugas yang terkunci...
+          </div>
         </div>
       </div>
     </div>
@@ -881,6 +952,8 @@
       setInterval(updateClock, 1000);
 
       document.getElementById('filter-history-date').value = filterDateHistory;
+      const pwaTgl = document.getElementById('pwa-monitoring-tanggal');
+      if (pwaTgl) pwaTgl.value = filterDateHistory;
 
       // ⚡ INSTANT LOAD: Tampilkan data dari Cache Lokal (0 detik / tanpa delay)
       try {
@@ -1150,6 +1223,7 @@
       renderPendingList();
       renderActiveList();
       renderHistoryTable();
+      updateBadgeCounterTugasPwa();
     }
 
     function updatePwaScheduleBadgeUI(cfg) {
@@ -1985,8 +2059,274 @@
       document.querySelectorAll('.tab-pane-content').forEach(p => p.classList.add('d-none'));
       document.querySelectorAll('.nav-tabs-pill .nav-link').forEach(b => b.classList.remove('active'));
 
-      document.getElementById('pane-' + tabId).classList.remove('d-none');
-      document.getElementById('tab-btn-' + tabId).classList.add('active');
+      var targetPane = document.getElementById('pane-' + tabId);
+      var targetBtn = document.getElementById('tab-btn-' + tabId);
+      if (targetPane) targetPane.classList.remove('d-none');
+      if (targetBtn) targetBtn.classList.add('active');
+
+      if (tabId === 'tugas') {
+        muatDataMonitoringTugasPwa(false);
+      }
+    }
+
+    // ========================================================
+    // 🛡️ SUPERVISI PROGRES MUSYRIF & BUKA KUNCI TUGAS (PWA KADIV)
+    // ========================================================
+    var rawPwaTugasMonitoringData = null;
+
+    function updateBadgeCounterTugasPwa() {
+      var tglEl = document.getElementById('pwa-monitoring-tanggal');
+      var tgl = (tglEl && tglEl.value) ? tglEl.value : filterDateHistory;
+      var roleEl = document.getElementById('pwa-monitoring-role');
+      var role = (roleEl && roleEl.value) ? roleEl.value : 'Musyrif';
+
+      callGasApi('kadiv_tugas_monitoring', { tanggal: tgl, role: role }, function(tRes) {
+        if (tRes && tRes.success) {
+          var count = tRes.total_tugas_terkunci || 0;
+          var badgeEl = document.getElementById('badge-count-tugas-terkunci');
+          if (badgeEl) badgeEl.textContent = count;
+          var statEl = document.getElementById('pwa-stat-tugas-terkunci');
+          if (statEl) statEl.textContent = count + ' Tugas';
+        }
+      });
+    }
+
+    function muatDataMonitoringTugasPwa(isManual) {
+      var tglInput = document.getElementById('pwa-monitoring-tanggal');
+      if (tglInput && !tglInput.value) {
+        tglInput.value = filterDateHistory;
+      }
+      var tgl = tglInput ? tglInput.value : filterDateHistory;
+
+      var roleInput = document.getElementById('pwa-monitoring-role');
+      var role = roleInput ? roleInput.value : 'Musyrif';
+
+      var refIcon = document.getElementById('pwa-refresh-tugas-icon');
+      if (isManual && refIcon) refIcon.classList.add('spin-animation');
+
+      var cardsContainer = document.getElementById('pwa-progres-musyrif-cards');
+      if (cardsContainer) {
+        cardsContainer.innerHTML = '<div class="col-12 text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Memuat progres pelaksanaan seluruh musyrif...</div>';
+      }
+
+      var listTerkunci = document.getElementById('pwa-tugas-terkunci-container');
+      if (listTerkunci) {
+        listTerkunci.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-danger me-2"></div>Memeriksa tugas yang terkunci karena lewat batas waktu...</div>';
+      }
+
+      var timeEl = document.getElementById('pwa-monitoring-time-info');
+      if (timeEl) {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, '0');
+        var m = String(now.getMinutes()).padStart(2, '0');
+        timeEl.innerHTML = '<i class="bi bi-clock me-1 text-primary"></i> Data per pukul ' + h + ':' + m + ' WIB';
+      }
+
+      callGasApi('kadiv_tugas_monitoring', { tanggal: tgl, role: role }, function(res) {
+        if (refIcon) refIcon.classList.remove('spin-animation');
+        if (!res || !res.success) {
+          showToast('Gagal memuat monitoring tugas: ' + (res ? res.message : 'Error'), 'danger');
+          if (cardsContainer) cardsContainer.innerHTML = '<div class="col-12 text-center py-3 text-danger">Gagal memuat data progres.</div>';
+          if (listTerkunci) listTerkunci.innerHTML = '<div class="text-center py-3 text-danger">Gagal memuat tugas terkunci.</div>';
+          return;
+        }
+
+        rawPwaTugasMonitoringData = res;
+
+        var count = res.total_tugas_terkunci || 0;
+        var badgeEl = document.getElementById('badge-count-tugas-terkunci');
+        if (badgeEl) badgeEl.textContent = count;
+        var statEl = document.getElementById('pwa-stat-tugas-terkunci');
+        if (statEl) statEl.textContent = count + ' Tugas';
+
+        var countMusyrifEl = document.getElementById('pwa-total-musyrif-count');
+        if (countMusyrifEl) countMusyrifEl.textContent = (res.total_musyrif || 0) + ' Musyrif Aktif';
+
+        renderProgresMusyrifCardsPwa(res.progres_musyrif || []);
+        renderTugasTerkunciCardsPwa(res.daftar_tugas_terkunci || []);
+      });
+    }
+
+    function renderProgresMusyrifCardsPwa(progresList) {
+      var container = document.getElementById('pwa-progres-musyrif-cards');
+      if (!container) return;
+
+      if (!progresList || progresList.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center py-4 text-muted"><i class="bi bi-info-circle me-1"></i> Tidak ada staf aktif pada peran ini.</div>';
+        return;
+      }
+
+      var html = '';
+      progresList.forEach(function(m) {
+        var pColor = m.persen === 100 ? 'bg-success' : (m.terkunci > 0 ? 'bg-danger' : (m.persen >= 50 ? 'bg-warning' : 'bg-primary'));
+        var statusBadge = '';
+        if (m.persen === 100) {
+          statusBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5"><i class="bi bi-check-all me-1"></i>Tuntas 100%</span>';
+        } else if (m.terkunci > 0) {
+          statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5"><i class="bi bi-lock-fill me-1"></i>' + m.terkunci + ' Terlewat</span>';
+        } else {
+          statusBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5"><i class="bi bi-clock-history me-1"></i>On Progress</span>';
+        }
+
+        var btnDispensasi = '';
+        if (m.terkunci > 0 && !m.is_unlocked_global) {
+          btnDispensasi = '<button type="button" class="btn btn-xs btn-outline-warning text-dark fw-bold rounded-pill px-2.5 py-1 shadow-xs" onclick="eksekusiBukaDispensasiMusyrifPwa(\'' + m.id_staff + '\', \'' + m.nama_staff.replace(/'/g, "\\'") + '\')"><i class="bi bi-key-fill text-warning me-1"></i>Buka Semua Izin</button>';
+        } else if (m.is_unlocked_global) {
+          btnDispensasi = '<span class="badge bg-success text-white py-1 px-2"><i class="bi bi-unlock-fill me-1"></i>Dispensasi Aktif</span>';
+        }
+
+        html += '<div class="col-12 col-md-6 mb-2.5">' +
+          '<div class="card border-0 shadow-sm rounded-4 h-100 p-3" style="background:#ffffff; border:1px solid #e2e8f0 !important;">' +
+            '<div class="d-flex align-items-center justify-content-between mb-2">' +
+              '<div class="d-flex align-items-center gap-2">' +
+                '<div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 34px; height: 34px; font-size: 13px;">' +
+                  (m.nama_staff ? m.nama_staff.charAt(0).toUpperCase() : 'M') +
+                '</div>' +
+                '<div>' +
+                  '<h6 class="fw-bold mb-0 text-dark" style="font-size: 13.5px;">' + m.nama_staff + '</h6>' +
+                  '<small class="text-muted" style="font-size: 11px;">' + m.id_staff + ' &bull; ' + m.role + '</small>' +
+                '</div>' +
+              '</div>' +
+              '<div>' + statusBadge + '</div>' +
+            '</div>' +
+
+            '<div class="mb-2">' +
+              '<div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 11.5px;">' +
+                '<span class="text-muted fw-semibold">Progres Tugas:</span>' +
+                '<span class="fw-bold text-dark">' + m.selesai + ' dari ' + m.total_tugas + ' (' + m.persen + '%)</span>' +
+              '</div>' +
+              '<div class="progress rounded-pill" style="height: 7px; background: #f1f5f9;">' +
+                '<div class="progress-bar ' + pColor + ' rounded-pill" role="progressbar" style="width: ' + m.persen + '%"></div>' +
+              '</div>' +
+            '</div>' +
+
+            '<div class="d-flex align-items-center justify-content-between pt-1 border-top" style="font-size: 11px;">' +
+              '<div class="d-flex align-items-center gap-1.5 flex-wrap">' +
+                '<span class="text-success fw-semibold"><i class="bi bi-check2 me-0.5"></i>' + m.selesai + ' Selesai</span> &bull; ' +
+                '<span class="text-danger fw-semibold"><i class="bi bi-lock me-0.5"></i>' + m.terkunci + ' Kunci</span> &bull; ' +
+                '<span class="text-muted"><i class="bi bi-hourglass me-0.5"></i>' + m.upcoming + ' Nanti</span>' +
+              '</div>' +
+              '<div>' + btnDispensasi + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderTugasTerkunciCardsPwa(daftarTerkunci) {
+      var container = document.getElementById('pwa-tugas-terkunci-container');
+      if (!container) return;
+
+      if (!daftarTerkunci || daftarTerkunci.length === 0) {
+        container.innerHTML = '<div class="card border-0 shadow-sm rounded-4 text-center py-4 px-3" style="background: #ecfdf5; border: 1px solid #a7f3d0 !important;">' +
+          '<div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-15 text-success mx-auto mb-2" style="width: 48px; height: 48px;">' +
+            '<i class="bi bi-check2-circle fs-3"></i>' +
+          '</div>' +
+          '<h6 class="fw-bold text-dark mb-1">Alhamdulillah, Tidak Ada Tugas Terkunci!</h6>' +
+          '<p class="text-muted small mb-0">Semua musyrif telah melapor tepat waktu atau tugas belum melewati batas jadwal sesi.</p>' +
+        '</div>';
+        return;
+      }
+
+      var html = '<div class="d-flex flex-column gap-2.5">';
+      daftarTerkunci.forEach(function(item) {
+        var isUnlocked = item.is_unlocked;
+        var btnAction = '';
+
+        if (isUnlocked) {
+          btnAction = '<span class="badge bg-success-subtle text-success border border-success px-2.5 py-1.5 fw-bold" style="font-size: 11.5px;"><i class="bi bi-unlock-fill me-1"></i>Izin Terbuka (Aktif)</span>';
+        } else {
+          btnAction = '<button type="button" class="btn btn-sm btn-warning text-dark fw-bold rounded-pill px-3 py-1 shadow-sm" style="font-size: 12px;" onclick="eksekusiBukaKunciItemPwa(\'' + item.id_staff + '\', \'' + item.nama_staff.replace(/'/g, "\\'") + '\', \'' + item.tanggal + '\', \'' + item.id_role + '\', \'' + item.id_tugas + '\', \'' + item.nama_tugas.replace(/'/g, "\\'") + '\')">' +
+            '<i class="bi bi-unlock-fill me-1"></i>Buka Kunci' +
+          '</button>';
+        }
+
+        html += '<div class="card border-0 shadow-sm rounded-4 p-3" style="background:#ffffff; border: 1px solid #fecdd3 !important;">' +
+          '<div class="d-flex align-items-start justify-content-between gap-2 mb-2">' +
+            '<div>' +
+              '<div class="d-flex align-items-center gap-1.5 flex-wrap mb-1">' +
+                '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-0.5 fw-bold" style="font-size: 11px;"><i class="bi bi-person-fill me-1"></i>' + item.nama_staff + '</span>' +
+                '<span class="badge bg-secondary-subtle text-secondary px-2 py-0.5" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>' + item.sesi_waktu + '</span>' +
+              '</div>' +
+              '<h6 class="fw-bold text-dark mb-0" style="font-size: 14px; line-height: 1.4;">' + item.nama_tugas + '</h6>' +
+            '</div>' +
+            '<div class="text-end">' + btnAction + '</div>' +
+          '</div>' +
+
+          '<div class="d-flex align-items-center justify-content-between pt-2 border-top" style="font-size: 11.5px;">' +
+            '<div class="text-danger fw-medium">' +
+              '<i class="bi bi-exclamation-circle-fill me-1"></i>' + item.keterangan +
+            '</div>' +
+            '<div class="text-muted">' +
+              'Jadwal: <span class="fw-semibold text-dark">' + item.jam_range + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+
+      container.innerHTML = html;
+    }
+
+    function eksekusiBukaKunciItemPwa(staffId, staffName, tanggal, roleId, idTugas, namaTugas) {
+      if (!confirm('Buka kunci tugas "' + namaTugas + '" untuk Ustadz ' + staffName + ' agar dapat dilaporkan sekarang?')) {
+        return;
+      }
+
+      showToast('Membuka kunci tugas ' + namaTugas + '...', 'info');
+
+      callGasApi('kadiv_tugas_unlock', {
+        staffId: staffId,
+        staffName: staffName,
+        tanggal: tanggal,
+        roleId: roleId,
+        idTugas: idTugas,
+        namaTugas: namaTugas,
+        status: 'UNLOCKED',
+        alasan: 'Dispensasi Khusus Kadiv (via PWA Kadiv)',
+        unlockedByName: 'Kadiv Kesantrian'
+      }, function(res) {
+        if (res && res.success) {
+          showToast('✅ Berhasil membuka kunci tugas untuk ' + staffName, 'success');
+          muatDataMonitoringTugasPwa(false);
+        } else {
+          showToast('Gagal: ' + (res ? res.message : 'Terjadi kesalahan'), 'danger');
+        }
+      });
+    }
+
+    function eksekusiBukaDispensasiMusyrifPwa(staffId, staffName) {
+      var tglInput = document.getElementById('pwa-monitoring-tanggal');
+      var tgl = tglInput ? tglInput.value : filterDateHistory;
+      var roleInput = document.getElementById('pwa-monitoring-role');
+      var role = roleInput ? roleInput.value : 'Musyrif';
+
+      if (!confirm('Buka izin dispensasi laporan seluruh tugas untuk Ustadz ' + staffName + ' pada tanggal ' + tgl + '?')) {
+        return;
+      }
+
+      showToast('Membuka dispensasi untuk ' + staffName + '...', 'info');
+
+      callGasApi('kadiv_tugas_unlock', {
+        staffId: staffId,
+        staffName: staffName,
+        tanggal: tgl,
+        roleId: role,
+        idTugas: 'SEMUA_TUGAS',
+        namaTugas: 'Dispensasi Seluruh Tugas',
+        status: 'UNLOCKED',
+        alasan: 'Dispensasi Harian Kadiv (via PWA Kadiv)',
+        unlockedByName: 'Kadiv Kesantrian'
+      }, function(res) {
+        if (res && res.success) {
+          showToast('✅ Izin dispensasi dibuka untuk ' + staffName, 'success');
+          muatDataMonitoringTugasPwa(false);
+        } else {
+          showToast('Gagal: ' + (res ? res.message : 'Terjadi kesalahan'), 'danger');
+        }
+      });
     }
 
     // ========================================================
